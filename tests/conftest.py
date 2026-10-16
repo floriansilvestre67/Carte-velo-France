@@ -17,7 +17,7 @@ import pytest
 RACINE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RACINE / "scripts"))
 
-from sources import amenagements, communes, departements, vls  # noqa: E402
+from sources import amenagements, communes, departements, regions, vls  # noqa: E402
 
 CODES = [f"{i:02d}" for i in range(1, 96) if i != 20] + ["2A", "2B"]
 TAILLE = 0.5  # degrés
@@ -110,6 +110,13 @@ def monde(tmp_path):
     urls = {}
     urls[departements.URL_CONTOURS] = ecrire(d, "contours.geojson", contours())
     urls[communes.URL_COMMUNES] = ecrire(d, "communes.json", liste_communes())
+    # 13 régions fictives ; le 63 et le 69 sont dans la même (84), comme en vrai
+    regs = [{"code": f"R{i}", "nom": f"Région {i}"} for i in range(12)] + [{"code": "84", "nom": "Auvergne-Rhône-Alpes"}]
+    deps_api = [{"code": c, "nom": f"Département {c}",
+                 "codeRegion": "84" if c in ("63", "69", "01") else f"R{CODES.index(c) % 12}"} for c in CODES]
+    deps_api.append({"code": "974", "nom": "La Réunion", "codeRegion": "04"})
+    urls[regions.URL_DEPARTEMENTS] = ecrire(d, "deps_api.json", deps_api)
+    urls[regions.URL_REGIONS] = ecrire(d, "regions.json", regs)
     urls[amenagements.URL_API_JEU] = ecrire(d, "jeu.json", jeu_datagouv())
     urls["https://static.data.gouv.fr/resources/amenagements-cyclables-france-metropolitaine/"
          "france-20261001.geojson"] = ecrire(d, "bnac.geojson", bnac())

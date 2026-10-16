@@ -135,6 +135,9 @@ select + label.titre-champ, .champ + .champ { margin-top: 14px; }
 .fiche tr.groupe th { color: var(--encre); font-weight: 700; padding-top: 12px; border-bottom-color: var(--encre); }
 .fiche tr.actif th, .fiche tr.actif td { background: #eaf5f0; }
 .indispo { color: var(--encre-douce); font-style: italic; }
+.rang-region { margin: 0 0 4px; color: var(--encre-douce); font-size: 0.92rem; }
+.resume-region { background: #f0f7f4; }
+.resume-region .sous-titre { margin: 6px 0 0; color: var(--encre-douce); font-size: 0.9rem; }
 
 /* ---------- Classement ---------- */
 
@@ -209,6 +212,7 @@ select + label.titre-champ, .champ + .champ { margin-top: 14px; }
   .entete { order: 1; }
   .reglages { order: 1; }
   .legende { order: 3; }
+  .resume-region { order: 4; }
   .fiche { order: 4; }
   .calques-section { order: 5; }
   .classement-section { order: 6; }

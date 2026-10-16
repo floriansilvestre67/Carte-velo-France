@@ -43,6 +43,7 @@ scripts/
   sources/
     departements.py       contours des départements
     communes.py           population et surface
+    regions.py            région de chaque département
     amenagements.py       aménagements cyclables (lecture en streaming)
     vls.py                vélos en libre-service (GBFS 1.x, 2.x, 3.x)
 tests/                    tests sur données fictives au format réel
@@ -60,7 +61,7 @@ site/
 |---|---|---|
 | Aménagements cyclables | [data.gouv.fr, jeu 60a37b7f303fdf4f2654b73d](https://www.data.gouv.fr/fr/datasets/amenagements-cyclables-france-metropolitaine/) (Geovelo, OSM) | ODbL |
 | Vélos en libre-service | Flux GBFS de [transport.data.gouv.fr](https://transport.data.gouv.fr) | propre à chaque flux |
-| Population, surface | [geo.api.gouv.fr](https://geo.api.gouv.fr) | Licence Ouverte |
+| Population, surface, régions | [geo.api.gouv.fr](https://geo.api.gouv.fr) | Licence Ouverte |
 | Contours | [gregoiredavid/france-geojson](https://github.com/gregoiredavid/france-geojson) | voir le dépôt |
 | Fonds de carte | OpenStreetMap, CyclOSM, © contributeurs OpenStreetMap | ODbL |
 

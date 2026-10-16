@@ -26,13 +26,14 @@ from pathlib import Path
 
 import indicateurs
 from reseau import ClientHTTP
-from sources import amenagements, communes, departements, vls
+from sources import amenagements, communes, departements, regions, vls
 
 TAILLE_MAX = 50 * 1024 * 1024  # 50 Mo par fichier publié
 
 CLES_AMENAGEMENTS = ["km_total"] + [f"km_{c}" for c in amenagements.CATEGORIES]
 CLES_VLS = ["vls_stations", "vls_velos"]
 CLES_COMMUNES = ["population", "surface_km2"]
+CLES_REGIONS = ["region", "region_nom"]
 
 
 def journal(message: str) -> None:
@@ -119,6 +120,20 @@ def construire(client, sortie: Path, travail: Path, url_precedent: str | None = 
     except Exception as e:
         journal(f"  ✗ {e}")
         appliquer_secours("communes", CLES_COMMUNES, e)
+
+    # 2 bis. Régions (pour le filtre régional du site)
+    journal("   Régions (geo.api.gouv.fr)…")
+    try:
+        table_regions = regions.charger(client)
+        for code in codes:
+            r = table_regions.get(code) or {}
+            props[code]["region"] = r.get("region")
+            props[code]["region_nom"] = r.get("region_nom")
+        sources_meta["regions"] = {"statut": "ok", "url": regions.URL_DEPARTEMENTS,
+                                   "detail": f"{len({r['region'] for r in table_regions.values()})} régions"}
+    except Exception as e:
+        journal(f"  ✗ {e}")
+        appliquer_secours("regions", CLES_REGIONS, e)
 
     # 3. Aménagements
     journal("3/5 Aménagements cyclables (data.gouv.fr)…")

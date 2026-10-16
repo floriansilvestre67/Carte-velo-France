@@ -157,3 +157,20 @@ def test_fichiers_legers(monde):
 
 def test_bnac_fixture_complete():
     assert len(bnac()["features"]) == 9
+
+
+def test_regions(monde):
+    meta, props, _, _ = lancer(monde)
+    assert props["63"]["region"] == "84" and props["63"]["region_nom"] == "Auvergne-Rhône-Alpes"
+    assert all(p["region"] for p in props.values())
+    assert meta["sources"]["regions"]["statut"] == "ok"
+
+
+def test_regions_indisponibles(monde):
+    from sources import regions
+    urls = dict(monde["urls"])
+    urls[regions.URL_REGIONS] = None
+    meta, props, _, _ = lancer(monde, urls=urls)
+    assert meta["sources"]["regions"]["statut"] == "indisponible"
+    assert props["63"]["region"] is None
+    assert props["63"]["score"] is not None   # le reste n'est pas affecté

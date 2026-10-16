@@ -4,6 +4,7 @@
   var NOMS = {
     contours: "Contours des départements",
     communes: "Population et surface",
+    regions: "Régions",
     amenagements: "Aménagements cyclables",
     vls: "Vélos en libre-service"
   };

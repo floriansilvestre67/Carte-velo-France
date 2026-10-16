@@ -30,6 +30,10 @@
           <label class="titre-champ" for="choix-indicateur">Afficher sur la carte</label>
           <select id="choix-indicateur"></select>
         </div>
+        <div class="champ" id="champ-region">
+          <label class="titre-champ" for="choix-region">Filtrer par région</label>
+          <select id="choix-region"><option value="">Toute la France</option></select>
+        </div>
         <div class="champ">
           <label class="titre-champ" for="choix-dep">Aller à un département</label>
           <select id="choix-dep"><option value="">Choisir…</option></select>
@@ -42,6 +46,8 @@
         <div class="legende-valeurs" id="legende-valeurs"></div>
         <div class="legende-indispo" id="legende-indispo" hidden><i aria-hidden="true"></i>Donnée indisponible</div>
       </section>
+
+      <section class="fiche resume-region" id="resume-region" hidden aria-live="polite"></section>
 
       <section class="fiche" id="fiche" hidden aria-live="polite" tabindex="-1"></section>
 

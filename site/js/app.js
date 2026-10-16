@@ -17,6 +17,7 @@
     geo: null,
     indicateur: "score",
     selection: null,     // code du département affiché dans la fiche
+    region: null,        // code de la région filtrée (null = toute la France)
     partie: "haut",      // onglet du classement
     seuils: [],
     couches: {},         // code -> couche Leaflet
@@ -67,6 +68,29 @@
   function proprietes() { return etat.geo.features.map(function (f) { return f.properties; }); }
 
   function nbDepartements() { return etat.geo.features.length; }
+
+  // ---------------------------------------------------------------- régions
+
+  function dansRegion(p) { return !etat.region || p.region === etat.region; }
+
+  function regions() {
+    var vues = {};
+    proprietes().forEach(function (p) { if (p.region && p.region_nom) vues[p.region] = p.region_nom; });
+    return Object.keys(vues).map(function (c) { return { code: c, nom: vues[c] }; })
+      .sort(function (a, b) { return a.nom.localeCompare(b.nom, "fr"); });
+  }
+
+  function nomRegion(code) {
+    var r = regions().find(function (x) { return x.code === code; });
+    return r ? r.nom : "";
+  }
+
+  /* Rang d'un département parmi ceux de sa région (1 = meilleur, ex æquo = même rang). */
+  function rangRegional(p, cle) {
+    if (!p.region || p[cle] == null) return null;
+    var voisins = proprietes().filter(function (q) { return q.region === p.region && q[cle] != null; });
+    return { rang: 1 + voisins.filter(function (q) { return q[cle] > p[cle]; }).length, sur: voisins.length };
+  }
 
   // ---------------------------------------------------------------- classes de couleur
 
@@ -126,6 +150,11 @@
     var p = feature.properties;
     var choisi = p.code === etat.selection;
     var opacite = opaciteAplat();
+    if (!dansRegion(p)) {
+      // Hors de la région filtrée : en retrait, mais toujours cliquable
+      return { fillColor: couleur(p[etat.indicateur]), fillOpacity: opacite * 0.18,
+               color: "#ffffff", weight: 0.5, opacity: 0.6 };
+    }
     return {
       fillColor: couleur(p[etat.indicateur]),
       fillOpacity: p[etat.indicateur] == null ? opacite * 0.7 : opacite,
@@ -174,6 +203,12 @@
     carte.fitBounds(etat.calqueDeps.getBounds(), { padding: [10, 10], maxZoom: 7 });
   }
 
+  function cadrerRegion() {
+    var couches = proprietes().filter(dansRegion).map(function (p) { return etat.couches[p.code]; });
+    if (!etat.region || !couches.length) { cadrerFrance(); return; }
+    carte.flyToBounds(L.featureGroup(couches).getBounds(), { padding: [20, 20], maxZoom: 9, duration: 0.6 });
+  }
+
   function recolorer() {
     etat.calqueDeps.setStyle(styleDep);
     if (etat.selection && etat.couches[etat.selection]) etat.couches[etat.selection].bringToFront();
@@ -211,11 +246,18 @@
 
   function majClassement() {
     var cle = etat.indicateur, ind = indicateur(cle);
-    var liste = proprietes().filter(function (p) { return p[cle] != null; })
+    var liste = proprietes().filter(function (p) { return p[cle] != null && dansRegion(p); })
       .sort(function (a, b) { return b[cle] - a[cle]; });
-    var extrait = etat.partie === "haut" ? liste.slice(0, 10) : liste.slice(-10).reverse();
+    // Une région compte au plus 13 départements : on les montre tous, sans onglets.
+    var extrait = etat.region ? liste
+      : etat.partie === "haut" ? liste.slice(0, 10) : liste.slice(-10).reverse();
     var max = liste.length ? liste[0][cle] : 0;
-    $("classement-titre").textContent = "Classement : " + ind.libelle.toLowerCase();
+    $("classement-titre").textContent = (etat.region ? "Classement en " + nomRegion(etat.region) : "Classement") +
+      " : " + ind.libelle.toLowerCase();
+    document.querySelector(".onglets").hidden = !!etat.region;
+    var rangDe = function (p) {
+      return etat.region ? 1 + liste.filter(function (q) { return q[cle] > p[cle]; }).length : p.rangs[cle];
+    };
     var ol = $("classement");
     ol.innerHTML = "";
     if (!extrait.length) {
@@ -227,11 +269,11 @@
       var b = document.createElement("button");
       b.type = "button";
       var largeur = max > 0 ? Math.max(2, p[cle] / max * 100) : 0;
-      b.innerHTML = '<span class="rang">' + ordinal(p.rangs[cle]) + "</span>" +
+      b.innerHTML = '<span class="rang">' + ordinal(rangDe(p)) + "</span>" +
         '<span class="nom">' + echapper(p.nom) + "</span>" +
         "<span>" + echapper(formater(p[cle], cle)) + "</span>" +
         '<span class="barre" aria-hidden="true" style="width:' + (largeur * 0.62).toFixed(1) + '%"></span>';
-      b.setAttribute("aria-label", ordinal(p.rangs[cle]) + " : " + p.nom + ", " + avecUnite(p[cle], cle));
+      b.setAttribute("aria-label", ordinal(rangDe(p)) + " : " + p.nom + ", " + avecUnite(p[cle], cle));
       b.addEventListener("click", function () { choisirDepartement(p.code, true); });
       li.appendChild(b);
       ol.appendChild(li);
@@ -251,8 +293,11 @@
     var ind = indicateur(cle);
     var v = avecUnite(p[cle], cle);
     var rang = p.rangs && p.rangs[cle];
+    var rr = etat.region ? rangRegional(p, cle) : null;
+    var texteRang = rang ? ordinal(rang) + " sur " + nbDepartements() : "";
+    if (rr) texteRang += (texteRang ? ", " : "") + ordinal(rr.rang) + " sur " + rr.sur + " dans la région";
     var cellule = v
-      ? echapper(v) + (rang ? '<span class="rang">' + ordinal(rang) + " sur " + nbDepartements() + "</span>" : "")
+      ? echapper(v) + (texteRang ? '<span class="rang">' + texteRang + "</span>" : "")
       : '<span class="indispo">indisponible</span>';
     return '<tr class="' + (cle === etat.indicateur ? "actif" : "") + '"><th scope="row">' +
       echapper(ind.libelle) + "</th><td>" + cellule + "</td></tr>";
@@ -271,6 +316,7 @@
     });
     var lignes = "";
     lignes += '<tr class="groupe"><th scope="rowgroup" colspan="2">Population et surface</th></tr>';
+    if (p.region_nom) lignes += '<tr><th scope="row">Région</th><td>' + echapper(p.region_nom) + "</td></tr>";
     lignes += '<tr><th scope="row">Population</th><td>' + (p.population != null
       ? echapper(new Intl.NumberFormat("fr-FR").format(p.population)) + " hab." : '<span class="indispo">indisponible</span>') + "</td></tr>";
     lignes += '<tr><th scope="row">Surface</th><td>' + (p.surface_km2 != null
@@ -282,7 +328,12 @@
 
     var score = p.score != null
       ? '<div class="score-bloc"><span class="valeur">' + formater(p.score, "score") + '</span><span class="unite">/ 100, ' +
-        ordinal(p.rangs.score) + " sur " + nbDepartements() + "</span></div>"
+        ordinal(p.rangs.score) + " sur " + nbDepartements() + "</span></div>" +
+        (function () {
+          var rr = rangRegional(p, "score");
+          return rr ? '<p class="rang-region">' + ordinal(rr.rang) + " sur " + rr.sur + " en " +
+            echapper(p.region_nom) + "</p>" : "";
+        })()
       : '<div class="score-bloc"><span class="indispo">Score indisponible</span></div>';
     var partiel = p.score != null && p.score_nb_indicateurs < etat.meta.score_indicateurs.length
       ? '<p class="indispo">Score calculé sur ' + p.score_nb_indicateurs + " indicateurs sur " +
@@ -298,6 +349,8 @@
 
   function choisirDepartement(code, recentrer) {
     etat.selection = code || null;
+    var p = etat.selection && proprietes().find(function (q) { return q.code === etat.selection; });
+    if (p && !dansRegion(p)) choisirRegion(null, false);
     $("choix-dep").value = etat.selection || "";
     recolorer();
     majFiche();
@@ -321,19 +374,88 @@
     majLegende();
     majClassement();
     majFiche();
+    majResumeRegion();
     majAdresse();
+  }
+
+  // ---------------------------------------------------------------- filtre régional
+
+  /* Totaux de la région : sommes des départements. Si un seul département manque
+     la donnée, le total est indisponible (on n'additionne pas des trous). */
+  function totalRegion(cle) {
+    var deps = proprietes().filter(dansRegion);
+    if (!deps.length || deps.some(function (p) { return p[cle] == null; })) return null;
+    return deps.reduce(function (s, p) { return s + p[cle]; }, 0);
+  }
+
+  function majResumeRegion() {
+    var bloc = $("resume-region");
+    if (!etat.region) { bloc.hidden = true; return; }
+    var nb = proprietes().filter(dansRegion).length;
+    var km = totalRegion("km_total"), pop = totalRegion("population"), surf = totalRegion("surface_km2");
+    var st = totalRegion("vls_stations"), velos = totalRegion("vls_velos");
+    var f0 = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 });
+    var f1 = new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+    var f2 = new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    var ligne = function (libelle, valeur) {
+      return '<tr><th scope="row">' + libelle + "</th><td>" +
+        (valeur == null ? '<span class="indispo">indisponible</span>' : echapper(valeur)) + "</td></tr>";
+    };
+    bloc.innerHTML =
+      '<div class="fiche-tete"><h2>' + echapper(nomRegion(etat.region)) + "</h2>" +
+      '<button type="button" class="bouton-fermer" id="fermer-region" aria-label="Revenir à toute la France">×</button></div>' +
+      '<p class="sous-titre">' + nb + " départements. Totaux de la région :</p><table>" +
+      ligne("Aménagements cyclables", km == null ? null : f0.format(km) + " km") +
+      ligne("Pour 10 000 habitants", km == null || !pop ? null : f1.format(km / pop * 1e4) + " km") +
+      ligne("Densité", km == null || !surf ? null : f2.format(km / surf) + " km / km²") +
+      ligne("Stations de vélos en libre-service", st == null ? null : f0.format(st)) +
+      ligne("Pour 100 000 habitants", st == null || !pop ? null : f1.format(st / pop * 1e5)) +
+      ligne("Vélos disponibles", velos == null ? null : f0.format(velos)) +
+      ligne("Population", pop == null ? null : f0.format(pop) + " hab.") +
+      "</table>";
+    bloc.hidden = false;
+    $("fermer-region").addEventListener("click", function () { choisirRegion(null, true); });
+  }
+
+  function remplirDepartements() {
+    var sel = $("choix-dep");
+    sel.innerHTML = '<option value="">Choisir…</option>';
+    proprietes().filter(dansRegion).slice()
+      .sort(function (a, b) { return a.nom.localeCompare(b.nom, "fr"); })
+      .forEach(function (p) {
+        var o = document.createElement("option");
+        o.value = p.code;
+        o.textContent = p.nom + " (" + p.code + ")";
+        sel.appendChild(o);
+      });
+    sel.value = etat.selection || "";
+  }
+
+  function choisirRegion(code, recadrer) {
+    etat.region = code && nomRegion(code) ? code : null;
+    $("choix-region").value = etat.region || "";
+    var p = etat.selection && proprietes().find(function (q) { return q.code === etat.selection; });
+    if (p && !dansRegion(p)) { etat.selection = null; majFiche(); }
+    remplirDepartements();
+    recolorer();
+    majClassement();
+    majFiche();
+    majResumeRegion();
+    majAdresse();
+    if (recadrer) cadrerRegion();
   }
 
   // ---------------------------------------------------------------- adresse partageable (#ind=…&dep=…)
 
   function lireAdresse() {
     var params = new URLSearchParams(location.hash.slice(1));
-    return { ind: params.get("ind"), dep: params.get("dep") };
+    return { ind: params.get("ind"), dep: params.get("dep"), reg: params.get("reg") };
   }
 
   function majAdresse() {
     var params = new URLSearchParams();
     if (etat.indicateur !== "score") params.set("ind", etat.indicateur);
+    if (etat.region) params.set("reg", etat.region);
     if (etat.selection) params.set("dep", etat.selection);
     var h = params.toString();
     history.replaceState(null, "", h ? "#" + h : location.pathname + location.search);
@@ -395,12 +517,16 @@
       groupes[i.groupe].appendChild(o);
     });
 
-    var deps = proprietes().slice().sort(function (a, b) { return a.nom.localeCompare(b.nom, "fr"); });
-    deps.forEach(function (p) {
+    remplirDepartements();
+
+    // Filtre régional : masqué si la source des régions est indisponible
+    var liste = regions();
+    $("champ-region").hidden = !liste.length;
+    liste.forEach(function (r) {
       var o = document.createElement("option");
-      o.value = p.code;
-      o.textContent = p.nom + " (" + p.code + ")";
-      $("choix-dep").appendChild(o);
+      o.value = r.code;
+      o.textContent = r.nom;
+      $("choix-region").appendChild(o);
     });
   }
 
@@ -429,10 +555,12 @@
 
     var adresse = lireAdresse();
     choisirIndicateur(adresse.ind || "score");
+    if (adresse.reg) choisirRegion(adresse.reg, !adresse.dep);
     if (adresse.dep && etat.couches[adresse.dep]) choisirDepartement(adresse.dep, true);
 
     $("choix-indicateur").addEventListener("change", function (e) { choisirIndicateur(e.target.value); });
     $("choix-dep").addEventListener("change", function (e) { choisirDepartement(e.target.value, true); });
+    $("choix-region").addEventListener("change", function (e) { choisirRegion(e.target.value, true); });
     $("onglet-haut").addEventListener("click", function () { choisirOnglet("haut"); });
     $("onglet-bas").addEventListener("click", function () { choisirOnglet("bas"); });
     $("calque-vls").addEventListener("change", function (e) { activerVLS(e.target.checked); });
