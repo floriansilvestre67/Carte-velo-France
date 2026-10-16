@@ -178,6 +178,27 @@ def monde(tmp_path):
     urls[G + "d/bikes"] = ecrire(d, "d_bikes.json", {"data": {"bikes": [
         {"bike_id": "1", "lat": v69[1], "lon": v69[0], "vehicle_type_id": "t"}]}})
 
+    # Système F : flux publiés séparément, sans gbfs.json (cas d'Amiens, Pompey…)
+    s33 = centre("33", 0.03, 0.03)
+    urls[G + "f/station_information.json"] = ecrire(d, "f_info.json", {"data": {"stations": [
+        {"station_id": "f1", "name": "Quinconces", "lat": s33[1], "lon": s33[0]}]}})
+    urls[G + "f/station_status.json"] = ecrire(d, "f_status.json", {"data": {"stations": [
+        {"station_id": "f1", "num_bikes_available": 2, "num_docks_available": 8}]}})
+
+    # Système H : vehicle_types en panne (cas de Pony Marseille) -> vélos supposés
+    s44 = centre("44", 0.03, 0.03)
+    urls[G + "h/gbfs.json"] = ecrire(d, "h.json", {"data": {"fr": {"feeds": [
+        {"name": "vehicle_types", "url": G + "h/types-en-panne"},
+        {"name": "station_information", "url": G + "h/info"},
+        {"name": "station_status", "url": G + "h/status"}]}}})
+    urls[G + "h/info"] = ecrire(d, "h_info.json", {"data": {"stations": [
+        {"station_id": "h1", "name": "Commerce", "lat": s44[1], "lon": s44[0]}]}})
+    urls[G + "h/status"] = ecrire(d, "h_status.json", {"data": {"stations": [
+        {"station_id": "h1", "num_bikes_available": 4}]}})
+
+    # Jeu G : le système A publié une deuxième fois sous une autre adresse (cas de Dott)
+    urls[G + "a-copie/gbfs.json"] = urls[G + "a/gbfs.json"]
+
     # Système E : flux en panne (URL absente de la table -> erreur simulée)
     jeux = [
         {"title": "VLS A", "type": "bike-scooter-sharing", "resources": [
@@ -191,6 +212,13 @@ def monde(tmp_path):
             {"format": "gbfs", "url": G + "d/gbfs.json"}]},
         {"title": "VLS E en panne", "type": "bike-scooter-sharing", "resources": [
             {"format": "gbfs", "url": G + "e/gbfs.json"}]},
+        {"title": "VLS F flux séparés", "type": "vehicles-sharing", "resources": [
+            {"format": "gbfs", "url": G + "f/station_information.json"},
+            {"format": "gbfs", "url": G + "f/station_status.json"}]},
+        {"title": "VLS A national", "type": "vehicles-sharing", "resources": [
+            {"format": "gbfs", "url": G + "a-copie/gbfs.json"}]},
+        {"title": "Vélos H", "type": "vehicles-sharing", "resources": [
+            {"format": "gbfs", "url": G + "h/gbfs.json"}]},
         {"title": "Autopartage", "type": "vehicles-sharing", "sub_types": ["carsharing"], "resources": [
             {"format": "gbfs", "url": G + "auto/gbfs.json"}]},
         {"title": "Horaires bus", "type": "public-transit", "resources": [{"format": "GTFS", "url": "x"}]},

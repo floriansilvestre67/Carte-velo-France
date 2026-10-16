@@ -46,11 +46,12 @@ def _contient(texte: str, mots) -> bool:
 # 1. Liste des flux
 # --------------------------------------------------------------------------
 
-def lister_flux(client) -> list[dict]:
+def lister_jeux(client) -> list[dict]:
+    """Jeux de données VLS : [{jeu: titre, urls: [ressources au format gbfs]}]."""
     jeux = client.get_json(URL_API_JEUX)
     if not isinstance(jeux, list):
         raise ValueError("Réponse inattendue de l'API transport.data.gouv.fr")
-    flux, vus = [], set()
+    resultat, vues = [], set()
     for jeu in jeux:
         if jeu.get("type") not in TYPES_JEUX:
             continue
@@ -59,14 +60,17 @@ def lister_flux(client) -> list[dict]:
         if sous_types and not any(_contient(s, MOTS_VELO) for s in sous_types) \
                 and any(_contient(s, MOTS_NON_VELO) for s in sous_types):
             continue
+        urls = []
         for r in jeu.get("resources") or []:
             if str(r.get("format", "")).lower() != "gbfs":
                 continue
             url = r.get("url") or r.get("original_url")
-            if url and url not in vus:
-                vus.add(url)
-                flux.append({"jeu": jeu.get("title") or "", "url": url})
-    return flux
+            if url and url not in vues:
+                vues.add(url)
+                urls.append(url)
+        if urls:
+            resultat.append({"jeu": jeu.get("title") or "", "urls": urls})
+    return resultat
 
 
 # --------------------------------------------------------------------------
@@ -85,39 +89,98 @@ def lire_decouverte(doc: dict) -> dict[str, str]:
     return {f["name"]: f["url"] for f in feeds if isinstance(f, dict) and f.get("name") and f.get("url")}
 
 
-def lire_systeme(client, flux: dict) -> dict:
-    """Télécharge et interprète un système GBFS. Lève une exception en cas d'échec."""
-    decouverte = client.get_json(flux["url"])
-    urls = lire_decouverte(decouverte)
-    if not urls:
-        raise ValueError("fichier de découverte gbfs.json sans flux")
+def type_de_flux(doc: dict) -> str | None:
+    """Devine la nature d'un flux GBFS publié seul (sans gbfs.json) d'après son contenu."""
+    data = doc.get("data") if isinstance(doc, dict) else None
+    if not isinstance(data, dict):
+        return None
+    if lire_decouverte(doc):
+        return "gbfs"
+    if isinstance(data.get("vehicle_types"), list):
+        return "vehicle_types"
+    if isinstance(data.get("bikes"), list) or isinstance(data.get("vehicles"), list):
+        return "free_bike_status"
+    stations = data.get("stations")
+    if isinstance(stations, list) and stations:
+        premier = stations[0] if isinstance(stations[0], dict) else {}
+        if "lat" in premier:
+            return "station_information"
+        if any(k in premier for k in ("num_bikes_available", "num_vehicles_available", "num_docks_available")):
+            return "station_status"
+    if "system_id" in data or "name" in data:
+        return "system_information"
+    return None
 
-    nom = flux["jeu"]
+
+def lire_jeu(client, jeu: dict) -> list[dict]:
+    """Lit toutes les ressources gbfs d'un jeu et renvoie ses systèmes.
+
+    Cas courant : chaque ressource est un fichier de découverte gbfs.json.
+    Cas particulier : le jeu publie ses flux séparément (station_information.json,
+    station_status.json…) ; on les rassemble alors en un seul système.
+    """
+    systemes, morceaux, cache, erreurs = [], {}, {}, []
+    for url in jeu["urls"]:
+        try:
+            doc = client.get_json(url)
+        except Exception as e:
+            erreurs.append(f"{type(e).__name__}: {e}")
+            continue
+        nature = type_de_flux(doc)
+        if nature == "gbfs":
+            systemes.append(lire_decouverte(doc))
+        elif nature:
+            morceaux.setdefault(nature, url)
+            cache[url] = doc
+    if not systemes and ("station_information" in morceaux or "free_bike_status" in morceaux):
+        systemes.append(morceaux)
+    if not systemes:
+        raise ValueError(erreurs[0] if erreurs else "aucun flux GBFS exploitable")
+    return [lire_systeme(client, urls, jeu["jeu"], cache) for urls in systemes]
+
+
+def lire_systeme(client, urls: dict[str, str], nom: str, cache: dict | None = None) -> dict:
+    """Interprète un système GBFS à partir de ses flux {nom_du_flux: url}."""
+    cache = cache or {}
+
+    def lire(cle):
+        url = urls[cle]
+        return cache[url] if url in cache else client.get_json(url)
+
+    signature = tuple(sorted(urls.values()))  # sert à repérer un même système publié deux fois
+    titre = nom
     if "system_information" in urls:
         try:
-            nom = _texte((client.get_json(urls["system_information"]).get("data") or {}).get("name")) or nom
+            nom = _texte((lire("system_information").get("data") or {}).get("name")) or nom
         except Exception:
             pass  # le nom est secondaire
 
     # Types de véhicules : quels identifiants correspondent à des vélos ?
+    # Flux facultatif : s'il est en panne, on considère que le système ne propose que des vélos,
+    # sauf si son titre parle de trottinettes.
     ids_velo: set[str] | None = None
+    types = None
     if "vehicle_types" in urls:
-        types = (client.get_json(urls["vehicle_types"]).get("data") or {}).get("vehicle_types") or []
+        try:
+            types = (lire("vehicle_types").get("data") or {}).get("vehicle_types") or []
+        except Exception:
+            types = None
+    if types:
         ids_velo = {str(t.get("vehicle_type_id")) for t in types
                     if str(t.get("form_factor", "")).lower() in FORMES_VELO}
-        if types and not ids_velo:
-            return {"nom": nom, "exclu": "aucun vélo (trottinettes, voitures ou autres)",
+        if not ids_velo:
+            return {"nom": nom, "signature": signature, "exclu": "aucun vélo (trottinettes, voitures ou autres)",
                     "stations": [], "libres": []}
-    elif _contient(flux["jeu"], ("trottinette", "scooter")):
-        return {"nom": nom, "exclu": "jeu de trottinettes", "stations": [], "libres": []}
+    elif _contient(titre, ("trottinette", "scooter")) and not _contient(titre, ("vélo", "velo", "bike")):
+        return {"nom": nom, "signature": signature, "exclu": "jeu de trottinettes", "stations": [], "libres": []}
 
     stations = []
     if "station_information" in urls:
-        infos = (client.get_json(urls["station_information"]).get("data") or {}).get("stations") or []
+        infos = (lire("station_information").get("data") or {}).get("stations") or []
         statuts = {}
         if "station_status" in urls:
             try:
-                for s in (client.get_json(urls["station_status"]).get("data") or {}).get("stations") or []:
+                for s in (lire("station_status").get("data") or {}).get("stations") or []:
                     statuts[str(s.get("station_id"))] = s
             except Exception:
                 statuts = {}  # positions sans disponibilités : on garde les stations
@@ -143,9 +206,9 @@ def lire_systeme(client, flux: dict) -> dict:
             stations.append({"lat": lat, "lon": lon, "nom": _texte(s.get("name")), "velos": velos})
 
     libres = []
-    url_libres = urls.get("vehicle_status") or urls.get("free_bike_status")
-    if url_libres:
-        data = client.get_json(url_libres).get("data") or {}
+    cle_libres = "vehicle_status" if "vehicle_status" in urls else "free_bike_status"
+    if cle_libres in urls:
+        data = lire(cle_libres).get("data") or {}
         for v in data.get("vehicles") or data.get("bikes") or []:
             if v.get("station_id"):
                 continue  # vélo garé en station : déjà compté dans station_status
@@ -159,7 +222,7 @@ def lire_systeme(client, flux: dict) -> dict:
             except (KeyError, TypeError, ValueError):
                 continue
 
-    return {"nom": nom, "exclu": None, "stations": stations, "libres": libres}
+    return {"nom": nom, "signature": signature, "exclu": None, "stations": stations, "libres": libres}
 
 
 # --------------------------------------------------------------------------
@@ -167,49 +230,54 @@ def lire_systeme(client, flux: dict) -> dict:
 # --------------------------------------------------------------------------
 
 def calculer(client, localisateur, codes_valides: set[str], travailleurs: int = 12) -> dict:
-    flux = lister_flux(client)
-    if not flux:
+    jeux = lister_jeux(client)
+    if not jeux:
         raise ValueError("Aucun flux GBFS trouvé sur transport.data.gouv.fr")
 
-    def essayer(f):
+    def essayer(jeu):
         try:
-            return f, lire_systeme(client, f), None
-        except Exception as e:  # un flux en panne ne doit pas tout bloquer
-            return f, None, f"{type(e).__name__}: {e}"[:200]
+            return jeu, lire_jeu(client, jeu), None
+        except Exception as e:  # un jeu en panne ne doit pas tout bloquer
+            return jeu, None, f"{type(e).__name__}: {e}"[:200]
 
     with ThreadPoolExecutor(max_workers=travailleurs) as pool:
-        resultats = list(pool.map(essayer, flux))
+        resultats = list(pool.map(essayer, jeux))
 
     par_dep = {code: {"stations": 0, "velos": 0} for code in codes_valides}
-    stations_carte, systemes, vues = [], [], set()
-    journal = {"flux": len(flux), "ok": 0, "exclus": 0, "echecs": 0, "erreurs": []}
+    stations_carte, systemes, vues, signatures = [], [], set(), set()
+    journal = {"jeux": len(jeux), "ok": 0, "exclus": 0, "echecs": 0, "doublons": 0, "erreurs": []}
 
-    for f, sysm, erreur in resultats:
+    for jeu, liste, erreur in resultats:
         if erreur:
             journal["echecs"] += 1
-            journal["erreurs"].append({"flux": f["jeu"], "url": f["url"], "erreur": erreur})
+            journal["erreurs"].append({"jeu": jeu["jeu"], "url": jeu["urls"][0], "erreur": erreur})
             continue
-        if sysm["exclu"]:
-            journal["exclus"] += 1
-            continue
-        journal["ok"] += 1
-        i_sys = len(systemes)
-        systemes.append(sysm["nom"])
-        for s in sysm["stations"]:
-            cle = (round(s["lat"], 5), round(s["lon"], 5))
-            if cle in vues:   # même station publiée par deux flux
+        for sysm in liste:
+            if sysm["signature"] in signatures:   # même système publié dans deux jeux (ex. national + ville)
+                journal["doublons"] += 1
                 continue
-            vues.add(cle)
-            dep = localisateur.trouver(s["lon"], s["lat"])
-            if dep not in par_dep:
-                continue  # hors métropole ou coordonnées aberrantes
-            par_dep[dep]["stations"] += 1
-            par_dep[dep]["velos"] += s["velos"] or 0
-            stations_carte.append([round(s["lat"], 5), round(s["lon"], 5), s["nom"], s["velos"], i_sys])
-        for lon, lat in sysm["libres"]:
-            dep = localisateur.trouver(lon, lat)
-            if dep in par_dep:
-                par_dep[dep]["velos"] += 1
+            signatures.add(sysm["signature"])
+            if sysm["exclu"]:
+                journal["exclus"] += 1
+                continue
+            journal["ok"] += 1
+            i_sys = len(systemes)
+            systemes.append(sysm["nom"])
+            for s in sysm["stations"]:
+                cle = (round(s["lat"], 5), round(s["lon"], 5))
+                if cle in vues:   # même station publiée par deux flux
+                    continue
+                vues.add(cle)
+                dep = localisateur.trouver(s["lon"], s["lat"])
+                if dep not in par_dep:
+                    continue  # hors métropole ou coordonnées aberrantes
+                par_dep[dep]["stations"] += 1
+                par_dep[dep]["velos"] += s["velos"] or 0
+                stations_carte.append([round(s["lat"], 5), round(s["lon"], 5), s["nom"], s["velos"], i_sys])
+            for lon, lat in sysm["libres"]:
+                dep = localisateur.trouver(lon, lat)
+                if dep in par_dep:
+                    par_dep[dep]["velos"] += 1
 
     if journal["ok"] == 0:
         raise ValueError(f"Aucun système VLS lisible ({journal['echecs']} échecs)")

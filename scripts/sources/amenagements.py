@@ -112,7 +112,7 @@ def agreger(chemin_geojson: Path, table_communes: dict[str, str], localisateur,
     """Parcourt le fichier en streaming et cumule les km par département et par catégorie."""
     km = {code: {c: 0.0 for c in CATEGORIES} for code in codes_valides}
     stats = {"troncons": 0, "troncons_sans_departement": 0, "km_hors_metropole": 0.0,
-             "date_maj_max": None}
+             "date_maj_max": None, "km_par_type_brut": {}}
 
     with open(chemin_geojson, "rb") as f:
         for feature in ijson.items(f, "features.item", use_float=True):
@@ -143,18 +143,20 @@ def agreger(chemin_geojson: Path, table_communes: dict[str, str], localisateur,
                     secours = localisateur.trouver(pt[0], pt[1]) if pt else None
                 dep_d, dep_g = dep_d or secours, dep_g or secours
 
-            cotes = [(cote_d, dep_d), (cote_g, dep_g)]
+            cotes = [(cote_d, dep_d, p.get("ame_d")), (cote_g, dep_g, p.get("ame_g"))]
             # Voie verte identique des deux côtés : une seule voie
             if cote_d == cote_g == "voies_vertes" and dep_d == dep_g:
-                cotes = [(cote_d, dep_d)]
+                cotes = cotes[:1]
 
-            for cat, dep in cotes:
+            for cat, dep, brut in cotes:
                 if cat is None:
                     continue
                 if dep is None:
                     stats["troncons_sans_departement"] += 1
                 elif dep in km:
                     km[dep][cat] += longueur
+                    cle = normaliser(brut)
+                    stats["km_par_type_brut"][cle] = stats["km_par_type_brut"].get(cle, 0.0) + longueur
                 else:
                     stats["km_hors_metropole"] += longueur
 

@@ -134,6 +134,9 @@ def construire(client, sortie: Path, travail: Path, url_precedent: str | None = 
             "statut": "ok", "url": res["ressource"]["url"], "titre": res["ressource"]["titre"],
             "date_donnees": res["ressource"]["publiee_le"] or st["date_maj_max"],
             "detail": f"{st['troncons']:,} tronçons lus".replace(",", " "),
+            # Kilomètres par valeur brute du schéma (pour vérifier le classement par catégorie)
+            "km_par_type": {k: round(v) for k, v in sorted(st["km_par_type_brut"].items(),
+                                                           key=lambda kv: -kv[1])},
         }
         journal(f"  {st['troncons']} tronçons, {st['troncons_sans_departement']} côtés sans département, "
                 f"{st['km_hors_metropole']:.0f} km hors métropole ignorés")
@@ -153,13 +156,14 @@ def construire(client, sortie: Path, travail: Path, url_precedent: str | None = 
         stations_carte = res["carte"]
         j = res["journal"]
         sources_meta["vls"] = {"statut": "ok", "url": vls.URL_API_JEUX, "date_donnees": maintenant[:10],
-                               "detail": f"{j['ok']} systèmes lus sur {j['flux']} flux "
-                                         f"({j['exclus']} sans vélo écartés, {j['echecs']} en échec)",
+                               "detail": f"{j['ok']} systèmes lus ({j['jeux']} jeux de données ; "
+                                         f"{j['exclus']} sans vélo écartés, {j['doublons']} doublons, "
+                                         f"{j['echecs']} en échec)",
                                "erreurs": j["erreurs"][:50]}
-        journal(f"  {j['ok']} systèmes OK, {j['exclus']} exclus, {j['echecs']} en échec, "
+        journal(f"  {j['ok']} systèmes OK, {j['exclus']} exclus, {j['doublons']} doublons, {j['echecs']} en échec, "
                 f"{len(stations_carte['stations'])} stations")
         for err in j["erreurs"][:30]:
-            journal(f"    - {err['flux']} : {err['erreur']}")
+            journal(f"    - {err['jeu']} : {err['erreur']}")
     except Exception as e:
         journal(f"  ✗ {e}")
         if appliquer_secours("vls", CLES_VLS, e) and precedent and precedent.get("stations"):

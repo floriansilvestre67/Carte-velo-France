@@ -81,6 +81,9 @@ def test_amenagements(monde):
     assert p63["km_total"] == pytest.approx(total, abs=0.02)
     assert meta["sources"]["amenagements"]["statut"] == "ok"
     assert meta["sources"]["amenagements"]["date_donnees"] == "2026-10-01"
+    types = meta["sources"]["amenagements"]["km_par_type"]
+    assert set(types) == {"PISTE CYCLABLE", "BANDE CYCLABLE", "VOIE VERTE",
+                          "DOUBLE SENS CYCLABLE NON MATERIALISE", "COULOIR BUS+VELO"}
 
 
 def test_vls(monde):
@@ -89,12 +92,14 @@ def test_vls(monde):
     assert (props["75"]["vls_stations"], props["75"]["vls_velos"]) == (1, 6)   # 4 vélos + 1 cargo + 1 libre
     assert (props["69"]["vls_stations"], props["69"]["vls_velos"]) == (0, 5)
     assert props["01"]["vls_stations"] == 0
-    assert len(stations["stations"]) == 3
+    assert (props["33"]["vls_stations"], props["33"]["vls_velos"]) == (1, 2)   # flux séparés assemblés
+    assert (props["44"]["vls_stations"], props["44"]["vls_velos"]) == (1, 4)   # vehicle_types en panne
+    assert len(stations["stations"]) == 5
     noms = {s[2] for s in stations["stations"]}
-    assert noms == {"Jaude", "Gare", "Châtelet"}
-    assert "Vélo Fictif A" in stations["systemes"]
+    assert noms == {"Jaude", "Gare", "Châtelet", "Quinconces", "Commerce"}
+    assert stations["systemes"].count("Vélo Fictif A") == 1                   # doublon écarté
     detail = meta["sources"]["vls"]["detail"]
-    assert "3 systèmes lus sur 5 flux" in detail and "1 sans vélo" in detail and "1 en échec" in detail
+    assert detail == "5 systèmes lus (8 jeux de données ; 1 sans vélo écartés, 1 doublons, 1 en échec)"
 
 
 def test_indicateurs_et_score(monde):
