@@ -1,0 +1,154 @@
+"""Tests de bout en bout du script de données, sur le monde fictif de conftest.py."""
+
+import json
+
+import pytest
+from conftest import CODES, bnac, ligne
+
+import construire_donnees
+import indicateurs
+from reseau import ClientFichiers
+from sources import amenagements, vls
+
+
+def lancer(monde, sortie_nom="site", urls=None, precedent=None):
+    sortie = monde["dossier"] / sortie_nom
+    client = ClientFichiers(urls or monde["urls"])
+    meta = construire_donnees.construire(client, sortie, monde["dossier"] / "travail", precedent)
+    geo = json.loads((sortie / "departements.geojson").read_text(encoding="utf-8"))
+    stations = json.loads((sortie / "stations.json").read_text(encoding="utf-8"))
+    props = {f["properties"]["code"]: f["properties"] for f in geo["features"]}
+    return meta, props, stations, sortie
+
+
+def L(code, dy=0.0):
+    return amenagements.longueur_km({"type": "LineString", "coordinates": ligne(code, dy=dy)})
+
+
+# ---------------------------------------------------------------- unités
+
+def test_categories_bnac():
+    assert amenagements.categorie("PISTE CYCLABLE") == "pistes"
+    assert amenagements.categorie(" piste  cyclable ") == "pistes"
+    assert amenagements.categorie("BANDE CYCLABLE") == "bandes"
+    assert amenagements.categorie("VOIE VERTE") == "voies_vertes"
+    assert amenagements.categorie("DOUBLE SENS CYCLABLE PISTE") == "double_sens"
+    assert amenagements.categorie("COULOIR BUS+VELO") == "autres"
+    assert amenagements.categorie("Aménagement mixte piéton vélo hors voie verte") == "autres"
+    assert amenagements.categorie("AUCUN") is None
+    assert amenagements.categorie(None) is None
+
+
+def test_longueur_geodesique():
+    # 1° de longitude à l'équateur ≈ 111,32 km
+    km = amenagements.longueur_km({"type": "LineString", "coordinates": [[0, 0], [1, 0]]})
+    assert km == pytest.approx(111.32, abs=0.01)
+
+
+def test_ressource_la_plus_recente(monde):
+    r = amenagements.trouver_ressource(ClientFichiers(monde["urls"]))
+    assert r["title"] == "france-20261001.geojson"
+
+
+def test_decouverte_gbfs_toutes_versions():
+    v1 = {"data": {"en": {"feeds": [{"name": "free_bike_status", "url": "u1"}]}}}
+    v2 = {"data": {"en": {"feeds": [{"name": "a", "url": "en"}]}, "fr": {"feeds": [{"name": "a", "url": "fr"}]}}}
+    v3 = {"data": {"feeds": [{"name": "vehicle_status", "url": "u3"}]}}
+    assert vls.lire_decouverte(v1) == {"free_bike_status": "u1"}
+    assert vls.lire_decouverte(v2) == {"a": "fr"}  # le français est préféré
+    assert vls.lire_decouverte(v3) == {"vehicle_status": "u3"}
+
+
+def test_rangs_centiles_et_egalites():
+    r = indicateurs.rangs_centiles({"a": 1, "b": 2, "c": 2, "d": 3, "e": None})
+    assert r == {"a": 0.0, "b": 50.0, "c": 50.0, "d": 100.0, "e": None}
+    assert indicateurs.rangs_nationaux({"a": 1, "b": 2, "c": 2, "d": None}) == {"a": 3, "b": 1, "c": 1, "d": None}
+
+
+# ---------------------------------------------------------------- bout en bout
+
+def test_amenagements(monde):
+    meta, props, _, _ = lancer(monde)
+    p63 = props["63"]
+    assert p63["km_pistes"] == pytest.approx(L("63"), abs=0.01)
+    assert p63["km_bandes"] == pytest.approx(2 * L("63", 0.01), abs=0.01)          # deux côtés
+    assert p63["km_voies_vertes"] == pytest.approx(L("63", 0.02), abs=0.01)        # une seule fois
+    assert props["69"]["km_double_sens"] == pytest.approx(L("69"), abs=0.01)       # localisé par position
+    assert props["75"]["km_autres"] == pytest.approx(L("75") + L("75", 0.01), abs=0.01)  # MultiLineString
+    assert props["2A"]["km_pistes"] == pytest.approx(L("2A"), abs=0.01)            # repli préfixe
+    assert props["01"]["km_total"] == 0                                             # 97411 ignoré
+    total = sum(p63[f"km_{c}"] for c in amenagements.CATEGORIES)
+    assert p63["km_total"] == pytest.approx(total, abs=0.02)
+    assert meta["sources"]["amenagements"]["statut"] == "ok"
+    assert meta["sources"]["amenagements"]["date_donnees"] == "2026-10-01"
+
+
+def test_vls(monde):
+    meta, props, stations, _ = lancer(monde)
+    assert (props["63"]["vls_stations"], props["63"]["vls_velos"]) == (2, 10)
+    assert (props["75"]["vls_stations"], props["75"]["vls_velos"]) == (1, 6)   # 4 vélos + 1 cargo + 1 libre
+    assert (props["69"]["vls_stations"], props["69"]["vls_velos"]) == (0, 5)
+    assert props["01"]["vls_stations"] == 0
+    assert len(stations["stations"]) == 3
+    noms = {s[2] for s in stations["stations"]}
+    assert noms == {"Jaude", "Gare", "Châtelet"}
+    assert "Vélo Fictif A" in stations["systemes"]
+    detail = meta["sources"]["vls"]["detail"]
+    assert "3 systèmes lus sur 5 flux" in detail and "1 sans vélo" in detail and "1 en échec" in detail
+
+
+def test_indicateurs_et_score(monde):
+    _, props, _, _ = lancer(monde)
+    p = props["63"]
+    assert p["population"] == sum(1000 * (CODES.index("63") + 1) + k for k in range(1, 13))
+    assert p["surface_km2"] == pytest.approx(12 * 25 + 1, abs=0.1)
+    assert p["km_10k_hab"] == pytest.approx(p["km_total"] / p["population"] * 1e4, rel=1e-2)
+    assert p["vls_stations_100k"] == pytest.approx(2 / p["population"] * 1e5, rel=1e-2)
+    for q in props.values():
+        assert 0 <= q["score"] <= 100
+        assert q["score_nb_indicateurs"] == 6
+        assert q["rangs"]["score"] >= 1
+    meilleur = min(props.values(), key=lambda q: q["rangs"]["score"])
+    assert meilleur["code"] in ("63", "75")
+
+
+def test_source_en_panne_sans_precedent(monde):
+    urls = dict(monde["urls"])
+    urls[vls.URL_API_JEUX] = None
+    meta, props, stations, _ = lancer(monde, urls=urls)
+    assert meta["sources"]["vls"]["statut"] == "indisponible"
+    assert props["63"]["vls_stations"] is None and props["63"]["vls_stations_100k"] is None
+    assert props["63"]["km_total"] > 0
+    assert props["63"]["score_nb_indicateurs"] == 3   # score calculé sur les seuls aménagements
+    assert stations["stations"] == []
+
+
+def test_source_en_panne_reprise_du_precedent(monde):
+    _, avant, _, sortie = lancer(monde, "v1")
+    base = "https://site.example/"
+    urls = dict(monde["urls"])
+    for nom in ("departements.geojson", "meta.json", "stations.json"):
+        urls[base + "data/" + nom] = sortie / nom
+    urls[amenagements.URL_API_JEU] = None
+    meta, apres, stations, _ = lancer(monde, "v2", urls=urls, precedent=base)
+    src = meta["sources"]["amenagements"]
+    assert src["statut"] == "reprise" and src["date_donnees"] == "2026-10-01"
+    assert apres["63"]["km_total"] == avant["63"]["km_total"]
+    assert apres["63"]["vls_stations"] == 2
+
+
+def test_contours_indispensables(monde):
+    urls = dict(monde["urls"])
+    urls[next(u for u in urls if "france-geojson" in u)] = None
+    with pytest.raises(Exception):
+        lancer(monde, urls=urls)
+
+
+def test_fichiers_legers(monde):
+    _, _, _, sortie = lancer(monde)
+    for f in sortie.iterdir():
+        assert f.stat().st_size < 50 * 1024 * 1024
+
+
+def test_bnac_fixture_complete():
+    assert len(bnac()["features"]) == 9

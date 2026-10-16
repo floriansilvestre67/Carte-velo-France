@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sources et méthode – Carte Vélo France</title>
+  <meta name="description" content="D'où viennent les données de la Carte Vélo France et comment les indicateurs et le score vélo sont calculés.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='7' fill='%230e7c5a'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <main class="page-texte">
+    <a class="retour" href="./">Retour à la carte</a>
+    <h1>Sources et méthode</h1>
+    <p>Tous les chiffres de la carte sont calculés automatiquement chaque jour à partir de données ouvertes. Quand une donnée manque, elle est affichée comme indisponible : rien n'est estimé ni inventé.</p>
+
+    <h2>État des données</h2>
+    <p id="genere">Chargement…</p>
+    <table>
+      <thead><tr><th scope="col">Source</th><th scope="col">État</th><th scope="col">Détail</th></tr></thead>
+      <tbody id="etat-sources"></tbody>
+    </table>
+
+    <h2>Sources</h2>
+    <h3>Aménagements cyclables</h3>
+    <p>Jeu national <a href="https://www.data.gouv.fr/fr/datasets/amenagements-cyclables-france-metropolitaine/">« Aménagements cyclables France métropolitaine »</a> publié sur data.gouv.fr par Geovelo, au format du schéma national des aménagements cyclables. Les données sont issues d'OpenStreetMap, sous licence ODbL (© contributeurs OpenStreetMap).</p>
+
+    <h3>Vélos en libre-service</h3>
+    <p>Flux temps réel au standard GBFS, référencés sur le <a href="https://transport.data.gouv.fr/datasets?type=vehicles-sharing">point d'accès national transport.data.gouv.fr</a>. Chaque flux a sa propre licence, indiquée sur sa page. Les trottinettes, scooters et voitures sont écartés grâce aux types de véhicules déclarés dans les flux.</p>
+
+    <h3>Population et surface</h3>
+    <p><a href="https://geo.api.gouv.fr/">API Découpage administratif</a> (geo.api.gouv.fr), données INSEE et IGN, Licence Ouverte Etalab. La population et la surface d'un département sont la somme de celles de ses communes.</p>
+
+    <h3>Contours des départements</h3>
+    <p>Version simplifiée du dépôt <a href="https://github.com/gregoiredavid/france-geojson">gregoiredavid/france-geojson</a>. Les conditions de réutilisation sont indiquées dans le dépôt.</p>
+
+    <h3>Fonds de carte</h3>
+    <p>Fond clair © <a href="https://carto.com/attributions">CARTO</a>, calque des pistes <a href="https://www.cyclosm.org">CyclOSM</a>, données © <a href="https://www.openstreetmap.org/copyright">contributeurs OpenStreetMap</a>.</p>
+
+    <h2>Calcul des indicateurs</h2>
+    <h3>Kilomètres d'aménagements</h3>
+    <p>Chaque tronçon de la base décrit les deux côtés de la voie. Chaque côté aménagé compte pour la longueur du tronçon : une rue avec une bande cyclable de chaque côté compte donc deux fois sa longueur. Une voie verte décrite à l'identique des deux côtés n'est comptée qu'une fois, car c'est une seule voie. La longueur est mesurée sur l'ellipsoïde terrestre (calcul géodésique) à partir du tracé.</p>
+    <p>Chaque côté est rattaché au département de sa commune (code INSEE). Si le code manque, on utilise la position du tronçon.</p>
+    <p>Les types du schéma national sont regroupés ainsi :</p>
+    <ul>
+      <li><strong>Pistes</strong> : pistes cyclables ;</li>
+      <li><strong>Bandes</strong> : bandes cyclables ;</li>
+      <li><strong>Voies vertes</strong> : voies vertes ;</li>
+      <li><strong>Double-sens</strong> : tous les double-sens cyclables (piste, bande ou non matérialisé) ;</li>
+      <li><strong>Autres</strong> : couloirs bus-vélo, vélorues, aménagements mixtes piétons-vélos, chaussées à voie centrale banalisée, goulottes, etc.</li>
+    </ul>
+
+    <h3>Rapportés à la population et à la surface</h3>
+    <ul>
+      <li>km pour 10 000 habitants = km d'aménagements ÷ population × 10 000 ;</li>
+      <li>densité = km d'aménagements ÷ surface en km² ;</li>
+      <li>stations pour 100 000 habitants = nombre de stations ÷ population × 100 000.</li>
+    </ul>
+
+    <h3>Vélos en libre-service</h3>
+    <p>Une station est rattachée au département où elle se trouve. Le nombre de vélos est un instantané : ce sont les vélos disponibles au moment de la mise à jour quotidienne, en station et en libre (free-floating). Il varie donc d'un jour à l'autre. Un système dont le flux est en panne ce jour-là n'est pas compté.</p>
+
+    <h2>Le score vélo</h2>
+    <p>Le score vélo, sur 100, résume six indicateurs :</p>
+    <ul>
+      <li>km d'aménagements cyclables ;</li>
+      <li>km d'aménagements pour 10 000 habitants ;</li>
+      <li>densité d'aménagements (km par km²) ;</li>
+      <li>nombre de stations de vélos en libre-service ;</li>
+      <li>nombre de vélos en libre-service disponibles ;</li>
+      <li>stations pour 100 000 habitants.</li>
+    </ul>
+    <p>Pour chaque indicateur, les départements sont classés et reçoivent un rang centile : 100 pour le premier, 0 pour le dernier, les autres régulièrement entre les deux. Les ex æquo reçoivent la moyenne de leurs rangs. Le score est la moyenne de ces six rangs centiles.</p>
+    <p>Exemple : un département premier sur trois indicateurs (100), et au milieu du classement sur les trois autres (50), obtient (3 × 100 + 3 × 50) ÷ 6 = 75.</p>
+    <p>Le score mesure une position relative entre départements, pas une qualité absolue. Il mélange volontairement des totaux, qui favorisent les grands départements, et des chiffres rapportés à la population ou à la surface, qui favorisent les départements urbains. Si une source est indisponible, le score est calculé sur les indicateurs restants et la fiche du département le signale.</p>
+
+    <h2>Limites</h2>
+    <ul>
+      <li>La base des aménagements dépend de la complétude d'OpenStreetMap, inégale selon les territoires.</li>
+      <li>Les systèmes de vélos en libre-service qui ne publient pas de flux GBFS ne sont pas comptés.</li>
+      <li>Seule la France métropolitaine est couverte pour l'instant.</li>
+    </ul>
+
+    <h2>Mise à jour</h2>
+    <p>Les données sont recalculées chaque jour et à chaque modification du site, par un script exécuté sur GitHub Actions. Si une source est injoignable, les chiffres de la veille sont conservés et signalés dans le tableau ci-dessus. Le <a href="https://github.com/floriansilvestre67/Carte-velo-France">code source</a> est public.</p>
+  </main>
+  <script src="js/methode.js"></script>
+</body>
+</html>

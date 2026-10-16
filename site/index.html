@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Carte Vélo France</title>
+  <meta name="description" content="Carte interactive des départements français : aménagements cyclables, vélos en libre-service et score vélo, à partir des données ouvertes.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='7' fill='%230e7c5a'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <a class="lien-evitement" href="#panneau">Aller au panneau de données</a>
+
+  <div class="appli">
+    <div id="carte" role="region" aria-label="Carte des départements. Utilisez le panneau pour choisir un département au clavier."></div>
+
+    <main class="panneau" id="panneau" tabindex="-1">
+      <section class="entete">
+        <h1><span class="pastille" aria-hidden="true"></span>Carte Vélo France</h1>
+        <p>Où fait-il bon pédaler ? Aménagements cyclables et vélos en libre-service, département par département.</p>
+      </section>
+
+      <section class="reglages">
+        <div class="champ">
+          <label class="titre-champ" for="choix-indicateur">Afficher sur la carte</label>
+          <select id="choix-indicateur"></select>
+        </div>
+        <div class="champ">
+          <label class="titre-champ" for="choix-dep">Aller à un département</label>
+          <select id="choix-dep"><option value="">Choisir…</option></select>
+        </div>
+      </section>
+
+      <section class="legende" aria-live="polite">
+        <p class="legende-titre" id="legende-titre">Chargement des données…</p>
+        <div class="legende-bande" id="legende-bande" aria-hidden="true"></div>
+        <div class="legende-valeurs" id="legende-valeurs"></div>
+        <div class="legende-indispo" id="legende-indispo" hidden><i aria-hidden="true"></i>Donnée indisponible</div>
+      </section>
+
+      <section class="fiche" id="fiche" hidden aria-live="polite" tabindex="-1"></section>
+
+      <section class="calques-section">
+        <div class="calques">
+          <label>
+            <input type="checkbox" id="calque-vls">
+            <span>Stations de vélos en libre-service
+              <small id="vls-info">Regroupées par secteur ; zoomez pour les détailler.</small></span>
+          </label>
+          <label>
+            <input type="checkbox" id="calque-cyclosm">
+            <span>Pistes et bandes cyclables (CyclOSM)
+              <small>Visibles en zoomant sur une ville.</small></span>
+          </label>
+        </div>
+      </section>
+
+      <section class="classement-section">
+        <h2 class="classement-titre" id="classement-titre">Classement</h2>
+        <div class="onglets" role="tablist" aria-label="Partie du classement">
+          <button role="tab" id="onglet-haut" aria-selected="true" aria-controls="classement">Les 10 premiers</button>
+          <button role="tab" id="onglet-bas" aria-selected="false" aria-controls="classement">Les 10 derniers</button>
+        </div>
+        <ol class="classement" id="classement" role="tabpanel"></ol>
+      </section>
+
+      <section class="pied">
+        <p id="maj">Mise à jour des données : …</p>
+        <p><a href="methode.html">Sources et méthode</a></p>
+        <p><a href="https://github.com/floriansilvestre67/Carte-velo-France">Code source sur GitHub</a></p>
+      </section>
+    </main>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+# Données générées par GitHub Actions : jamais commitées
+site/data/
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+
+# Système
+.DS_Store

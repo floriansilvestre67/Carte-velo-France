@@ -1,0 +1,219 @@
+/* Carte Vélo France — feuille de style
+   Palette inspirée de la signalétique des voies vertes : vert franc sur fond gris-blanc froid. */
+
+:root {
+  --fond: #f4f7f6;
+  --surface: #ffffff;
+  --encre: #1f2a2e;
+  --encre-douce: #55636a;
+  --trait: #d9e1df;
+  --vert: #0e7c5a;
+  --vert-fonce: #0a5a42;
+  --indispo: #c9cfcc;
+  --focus: #e0a800;
+  --rayon: 6px;
+  --panneau: 390px;
+  --police: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; height: 100%; }
+
+body {
+  font-family: var(--police);
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--encre);
+  background: var(--fond);
+  font-variant-numeric: tabular-nums;
+}
+
+a { color: var(--vert-fonce); text-underline-offset: 2px; }
+a:hover { color: var(--vert); }
+
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+.visuellement-cache {
+  position: absolute !important; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap;
+}
+
+.lien-evitement {
+  position: absolute; left: 8px; top: -60px; z-index: 2000;
+  background: var(--encre); color: #fff; padding: 8px 12px; border-radius: var(--rayon);
+}
+.lien-evitement:focus { top: 8px; }
+
+/* ---------- Mise en page : carte + panneau ---------- */
+
+.appli {
+  display: grid;
+  grid-template-columns: 1fr var(--panneau);
+  height: 100vh;
+  height: 100dvh;
+}
+
+#carte { height: 100%; background: #e9eeec; }
+
+.panneau {
+  background: var(--surface);
+  border-left: 1px solid var(--trait);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.panneau > section { padding: 18px 22px; border-bottom: 1px solid var(--trait); }
+.panneau > section:last-of-type { border-bottom: 0; }
+
+.entete h1 {
+  font-size: 1.55rem; line-height: 1.15; margin: 0 0 4px; letter-spacing: -0.01em;
+}
+.entete h1 .pastille {
+  display: inline-block; width: 0.62em; height: 0.62em; border-radius: 50%;
+  background: var(--vert); margin-right: 0.3em; vertical-align: 0.05em;
+}
+.entete p { margin: 0; color: var(--encre-douce); font-size: 0.92rem; }
+
+label.titre-champ { display: block; font-weight: 700; margin-bottom: 6px; }
+
+select {
+  width: 100%; font: inherit; color: var(--encre);
+  padding: 9px 36px 9px 12px; border: 1px solid #b9c5c2; border-radius: var(--rayon);
+  background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%231f2a2e' stroke-width='2' fill='none'/%3E%3C/svg%3E") no-repeat right 12px center;
+  appearance: none;
+}
+select + label.titre-champ, .champ + .champ { margin-top: 14px; }
+
+/* ---------- Légende : une bande segmentée, comme un marquage au sol ---------- */
+
+.legende-titre { font-weight: 700; margin: 0 0 8px; }
+.legende-bande { display: flex; height: 14px; border-radius: 3px; overflow: hidden; }
+.legende-bande span { flex: 1; }
+.legende-valeurs {
+  display: flex; justify-content: space-between; font-size: 0.82rem;
+  color: var(--encre-douce); margin-top: 4px;
+}
+.legende-indispo { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; margin-top: 10px; color: var(--encre-douce); }
+.legende-indispo i {
+  width: 22px; height: 12px; border-radius: 2px; display: inline-block;
+  background: repeating-linear-gradient(45deg, var(--indispo) 0 3px, #e4e8e6 3px 6px);
+}
+
+/* ---------- Calques ---------- */
+
+.calques { display: flex; flex-direction: column; gap: 8px; }
+.calques label { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
+.calques input { width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--vert); }
+.calques small { display: block; color: var(--encre-douce); font-size: 0.82rem; }
+
+/* ---------- Fiche département ---------- */
+
+.fiche[hidden] { display: none; }
+.fiche-tete { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.fiche h2 { margin: 0; font-size: 1.3rem; line-height: 1.2; }
+.fiche .code { color: var(--encre-douce); font-weight: 400; }
+.bouton-fermer {
+  border: 1px solid var(--trait); background: var(--surface); border-radius: var(--rayon);
+  width: 34px; height: 34px; font-size: 1.2rem; line-height: 1; cursor: pointer; color: var(--encre);
+  flex: none;
+}
+.bouton-fermer:hover { background: var(--fond); }
+
+.score-bloc { display: flex; align-items: baseline; gap: 10px; margin: 12px 0 4px; }
+.score-bloc .valeur { font-size: 2.6rem; font-weight: 700; line-height: 1; color: var(--vert-fonce); }
+.score-bloc .unite { color: var(--encre-douce); }
+
+.fiche table { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin-top: 10px; }
+.fiche th, .fiche td { padding: 6px 0; border-bottom: 1px solid var(--trait); vertical-align: top; }
+.fiche th { text-align: left; font-weight: 400; color: var(--encre-douce); padding-right: 8px; }
+.fiche td { text-align: right; white-space: nowrap; }
+.fiche td .rang { display: block; font-size: 0.78rem; color: var(--encre-douce); }
+.fiche tr.groupe th { color: var(--encre); font-weight: 700; padding-top: 12px; border-bottom-color: var(--encre); }
+.fiche tr.actif th, .fiche tr.actif td { background: #eaf5f0; }
+.indispo { color: var(--encre-douce); font-style: italic; }
+
+/* ---------- Classement ---------- */
+
+.onglets { display: flex; gap: 4px; margin: 10px 0 12px; border-bottom: 1px solid var(--trait); }
+.onglets button {
+  font: inherit; background: none; border: 0; padding: 6px 10px 8px; cursor: pointer;
+  color: var(--encre-douce); border-bottom: 3px solid transparent; margin-bottom: -1px;
+}
+.onglets button[aria-selected="true"] { color: var(--encre); font-weight: 700; border-bottom-color: var(--vert); }
+
+.classement-titre { margin: 0; font-size: 1.05rem; }
+.classement { list-style: none; margin: 0; padding: 0; }
+.classement li + li { margin-top: 2px; }
+.classement button {
+  width: 100%; display: grid; grid-template-columns: 2.2em 1fr auto; gap: 8px; align-items: center;
+  font: inherit; font-size: 0.92rem; text-align: left; color: var(--encre);
+  background: none; border: 0; border-radius: 4px; padding: 5px 6px; cursor: pointer; position: relative;
+}
+.classement button:hover { background: var(--fond); }
+.classement .rang { color: var(--encre-douce); font-size: 0.85rem; }
+.classement .nom { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.classement .barre {
+  position: absolute; left: calc(2.2em + 14px); bottom: 1px; height: 3px; background: var(--vert);
+  border-radius: 2px; opacity: 0.55;
+}
+
+/* ---------- Pied de panneau ---------- */
+
+.pied { margin-top: auto; font-size: 0.85rem; color: var(--encre-douce); }
+.pied p { margin: 0 0 6px; }
+
+.message-erreur {
+  background: #fff4e5; border: 1px solid #f0c27a; border-radius: var(--rayon);
+  padding: 12px 14px; font-size: 0.92rem;
+}
+
+/* ---------- Leaflet ---------- */
+
+.leaflet-container { font-family: var(--police); }
+.leaflet-tooltip.info-dep { font-size: 0.9rem; padding: 6px 10px; border-radius: 4px; }
+.leaflet-tooltip.info-dep strong { display: block; }
+.leaflet-popup-content { font-size: 0.9rem; line-height: 1.4; }
+.cluster-vls {
+  background: rgba(14, 124, 90, 0.9); color: #fff; border: 2px solid #fff; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.8rem;
+  box-shadow: 0 0 0 1px rgba(31, 42, 46, 0.25);
+}
+
+/* ---------- Page « Sources et méthode » ---------- */
+
+.page-texte { max-width: 72ch; margin: 0 auto; padding: 32px 20px 64px; }
+.page-texte h1 { font-size: 2rem; line-height: 1.15; margin: 8px 0 12px; }
+.page-texte h2 { font-size: 1.3rem; margin: 2em 0 0.5em; }
+.page-texte h3 { font-size: 1.05rem; margin: 1.5em 0 0.4em; }
+.page-texte p, .page-texte li { line-height: 1.6; }
+.page-texte table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+.page-texte th, .page-texte td { text-align: left; padding: 7px 8px 7px 0; border-bottom: 1px solid var(--trait); vertical-align: top; }
+.statut { font-weight: 700; white-space: nowrap; }
+.statut.ok { color: var(--vert-fonce); }
+.statut.reprise { color: #9a6200; }
+.statut.indisponible { color: #a3261b; }
+.retour { display: inline-block; margin-bottom: 8px; }
+
+/* ---------- Mobile : carte en haut, panneau en dessous ---------- */
+
+@media (max-width: 820px) {
+  .appli { display: flex; flex-direction: column; height: auto; }
+  #carte { height: 58vh; height: 58svh; min-height: 320px; order: 2; }
+  .panneau { display: contents; }
+  .panneau > section { background: var(--surface); }
+  .entete { order: 1; }
+  .reglages { order: 1; }
+  .legende { order: 3; }
+  .fiche { order: 4; }
+  .calques-section { order: 5; }
+  .classement-section { order: 6; }
+  .pied { order: 7; }
+  .panneau > section { padding: 14px 16px; }
+  .entete h1 { font-size: 1.3rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+}
