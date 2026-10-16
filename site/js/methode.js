@@ -7,6 +7,15 @@
     amenagements: "Aménagements cyclables",
     vls: "Vélos en libre-service"
   };
+  // Même regroupement que scripts/sources/amenagements.py
+  function categorie(t) {
+    if (t.indexOf("DOUBLE SENS") === 0) return "Double-sens";
+    if (t === "PISTE CYCLABLE") return "Pistes";
+    if (t === "BANDE CYCLABLE") return "Bandes";
+    if (t === "VOIE VERTE") return "Voies vertes";
+    return "Autres";
+  }
+
   var ETATS = { ok: "À jour", reprise: "Chiffres de la veille", indisponible: "Indisponible" };
 
   function cellule(texte, classe) {
@@ -39,6 +48,25 @@
       tr.appendChild(cellule(detail));
       corps.appendChild(tr);
     });
+
+    // Détail des kilomètres par valeur brute du schéma national
+    var types = ((meta.sources || {}).amenagements || {}).km_par_type;
+    var corpsTypes = document.getElementById("types-bruts");
+    corpsTypes.innerHTML = "";
+    if (!types) {
+      corpsTypes.appendChild(document.createElement("tr")).appendChild(cellule("Détail indisponible."));
+    } else {
+      var fmt = new Intl.NumberFormat("fr-FR");
+      Object.keys(types).forEach(function (t) {
+        var tr = document.createElement("tr");
+        tr.appendChild(cellule(t.charAt(0) + t.slice(1).toLowerCase()));
+        tr.appendChild(cellule(categorie(t)));
+        var km = cellule(fmt.format(types[t]));
+        km.style.textAlign = "right";
+        tr.appendChild(km);
+        corpsTypes.appendChild(tr);
+      });
+    }
   }).catch(function () {
     document.getElementById("genere").textContent = "L'état des données n'a pas pu être chargé.";
   });

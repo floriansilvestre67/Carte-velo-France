@@ -116,12 +116,19 @@
     attribution: 'Pistes : <a href="https://www.cyclosm.org">CyclOSM</a>'
   });
 
+  /* Plus on zoome, plus les aplats s'effacent, pour laisser voir le plan et les pistes CyclOSM. */
+  function opaciteAplat() {
+    var z = carte.getZoom();
+    return z <= 7 ? 0.82 : z <= 8 ? 0.6 : z <= 10 ? 0.35 : 0.15;
+  }
+
   function styleDep(feature) {
     var p = feature.properties;
     var choisi = p.code === etat.selection;
+    var opacite = opaciteAplat();
     return {
       fillColor: couleur(p[etat.indicateur]),
-      fillOpacity: p[etat.indicateur] == null ? 0.55 : 0.82,
+      fillOpacity: p[etat.indicateur] == null ? opacite * 0.7 : opacite,
       color: choisi ? "#1f2a2e" : "#ffffff",
       weight: choisi ? 3 : 0.8,
       opacity: 1
@@ -147,6 +154,7 @@
         });
       }
     }).addTo(carte);
+    carte.on("zoomend", recolorer);
     cadrerFrance();
     // Si la carte était invisible au chargement (onglet en arrière-plan, panneau replié),
     // sa taille était nulle : on recadre dès qu'elle prend une vraie taille.
