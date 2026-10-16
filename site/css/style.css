@@ -18,6 +18,8 @@
 
 * { box-sizing: border-box; }
 
+[hidden] { display: none !important; }
+
 html, body { margin: 0; height: 100%; }
 
 body {
@@ -172,6 +174,7 @@ select + label.titre-champ, .champ + .champ { margin-top: 14px; }
 /* ---------- Leaflet ---------- */
 
 .leaflet-container { font-family: var(--police); }
+.fond-gris { filter: grayscale(1) contrast(0.85) brightness(1.08); }
 .leaflet-tooltip.info-dep { font-size: 0.9rem; padding: 6px 10px; border-radius: 4px; }
 .leaflet-tooltip.info-dep strong { display: block; }
 .leaflet-popup-content { font-size: 0.9rem; line-height: 1.4; }

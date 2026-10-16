@@ -103,9 +103,10 @@
   var carte = L.map("carte", { zoomSnap: 0.25, minZoom: 4, maxZoom: 18, attributionControl: true });
   carte.setView([46.6, 2.4], 5.75);
 
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
-    subdomains: "abcd", maxZoom: 19,
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">contributeurs OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+  // Fond OpenStreetMap, passé en gris (classe CSS « fond-gris ») pour laisser la couleur aux données.
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19, className: "fond-gris",
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">contributeurs OpenStreetMap</a>'
   }).addTo(carte);
 
   carte.createPane("calqueCyclOSM");
@@ -146,7 +147,23 @@
         });
       }
     }).addTo(carte);
-    carte.fitBounds(etat.calqueDeps.getBounds(), { padding: [10, 10] });
+    cadrerFrance();
+    // Si la carte était invisible au chargement (onglet en arrière-plan, panneau replié),
+    // sa taille était nulle : on recadre dès qu'elle prend une vraie taille.
+    if (window.ResizeObserver) {
+      new ResizeObserver(function () {
+        var t = carte.getSize();
+        carte.invalidateSize();
+        if (etat.cadrageAVide && t.x > 0 && t.y > 0) cadrerFrance();
+      }).observe($("carte"));
+    }
+  }
+
+  function cadrerFrance() {
+    var t = carte.getSize();
+    etat.cadrageAVide = !(t.x > 0 && t.y > 0);
+    if (etat.cadrageAVide) return;
+    carte.fitBounds(etat.calqueDeps.getBounds(), { padding: [10, 10], maxZoom: 7 });
   }
 
   function recolorer() {

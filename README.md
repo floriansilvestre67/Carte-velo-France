@@ -62,7 +62,7 @@ site/
 | Vélos en libre-service | Flux GBFS de [transport.data.gouv.fr](https://transport.data.gouv.fr) | propre à chaque flux |
 | Population, surface | [geo.api.gouv.fr](https://geo.api.gouv.fr) | Licence Ouverte |
 | Contours | [gregoiredavid/france-geojson](https://github.com/gregoiredavid/france-geojson) | voir le dépôt |
-| Fonds de carte | CARTO, CyclOSM, © contributeurs OpenStreetMap | ODbL |
+| Fonds de carte | OpenStreetMap, CyclOSM, © contributeurs OpenStreetMap | ODbL |
 
 La méthode de calcul (comptage des côtés, rangs centiles, score) est détaillée sur la page « Sources et méthode » du site.
 
