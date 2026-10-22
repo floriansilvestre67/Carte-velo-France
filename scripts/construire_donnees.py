@@ -292,7 +292,7 @@ def construire(client, sortie: Path, travail: Path, url_precedent: str | None = 
     poi_par_dep = None
     ancien_poi = ((precedent or {}).get("meta", {}).get("sources") or {}).get("poi") or {}
     age = None
-    if ancien_poi.get("date_donnees") and ancien_poi.get("statut") == "ok":
+    if ancien_poi.get("date_donnees") and ancien_poi.get("statut") == "ok" and ancien_poi.get("version") == poi.VERSION:
         age = (datetime.fromisoformat(maintenant[:10]) - datetime.fromisoformat(ancien_poi["date_donnees"])).days
     if age is not None and age < POI_JOURS and not os.environ.get("FORCER_POI"):
         anciens = {dep: fichier_precedent(client, url_precedent, f"poi/{dep}.json") for dep in codes}
@@ -306,9 +306,10 @@ def construire(client, sortie: Path, travail: Path, url_precedent: str | None = 
             poi_par_dep = res_p["par_dep"]
             st = res_p["stats"]
             sources_meta["poi"] = {
-                "statut": "ok", "url": "https://www.data.gouv.fr/datasets/" + poi.ID_DATATOURISME,
+                "statut": "ok", "url": "https://www.data.gouv.fr/datasets/" + poi.ID_DATATOURISME, "version": poi.VERSION,
                 "date_donnees": maintenant[:10],
-                "detail": f"{sum(res_p['comptes'].values()):,} lieux retenus ; {st.get('doublons', 0):,} doublons fusionnés".replace(",", " ")
+                "detail": (f"{sum(res_p['comptes'].values()):,} lieux retenus, dont {st.get('officiels_lus', 0):,} monuments "
+                           f"et musées officiels lus ; {st.get('doublons', 0):,} doublons fusionnés").replace(",", " ")
                           + (" ; sources en échec : " + ", ".join(res_p["erreurs"]) if res_p["erreurs"] else ""),
                 "comptes": res_p["comptes"], "classes_gardees": st.get("classes_gardees"),
                 "classes_ecartees": st.get("classes_ecartees")}

@@ -170,8 +170,9 @@ def poi_fictifs(d: Path, urls: dict) -> None:
         ressources.append({"title": f"datatourisme-{nom}.csv", "url": url, "format": "csv"})
     urls[poi.URL_API.format(poi.ID_DATATOURISME)] = ecrire(d, "jeu-dt.json", {"resources": ressources})
 
-    merimee = [["Reference", "Titre_editorial_de_la_notice", "Denomination_de_l_edifice", "Typologie_de_la_protection",
-                "Format_abrege_du_siecle_de_construction", "coordonnees_au_format_WGS84"],
+    # En-têtes tels qu'ils sont dans les vrais fichiers du Ministère (accents, espaces)
+    merimee = [["Référence", "Titre éditorial de la notice", "Dénomination de l'édifice", "Typologie de la protection",
+                "Format abrégé du siècle de construction", "Coordonnées au format WGS84"],
                ["PA001", "Église Notre-Dame", "église", "classé MH", "12e s.", f"{lat + 0.0101}, {lon}"],   # 11 m de u3
                ["PA002", "Halle aux blés", "halle", "inscrit MH", "19e s.", f"{lat + 0.04}, {lon}"],
                ["PA003", "Sans coordonnées", "croix", "inscrit MH", "", ""]]
@@ -183,7 +184,7 @@ def poi_fictifs(d: Path, urls: dict) -> None:
         {"title": "geojson", "format": "geojson", "url": "https://culture.example/merimee.geojson"},
         {"title": "csv", "format": "csv", "url": "https://culture.example/merimee.csv"}]})
     lon69, lat69 = centre("69")
-    museofile = [["Identifiant", "Nom_officiel", "Ville", "URL", "Coordonnees", "Atout"],
+    museofile = [["Identifiant", "Nom officiel", "Ville", "URL", "Coordonnées", "Atout"],
                  ["M1", "Musée d'art Roger Quilliot", "Clermont", "www.musee.example", f"{lat + 0.0005}, {lon + 0.0005}", ""],
                  ["M2", "Musée des Confluences", "Lyon", "", f"{lat69}, {lon69}", "Sciences et sociétés"]]
     chemin = d / "museofile.csv"

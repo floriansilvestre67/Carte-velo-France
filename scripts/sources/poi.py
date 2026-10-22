@@ -30,6 +30,7 @@ from pathlib import Path
 
 from sources.communes import departement_du_code
 
+VERSION = 2  # à augmenter quand la sélection change : force le recalcul sans attendre la semaine
 ID_DATATOURISME = "5b598be088ee387c0c353714"
 ID_MERIMEE = "5af120e5b595087cfabcde81"
 ID_MUSEOFILE = "5d12ee8206e3e762c0c89a4c"
@@ -86,10 +87,10 @@ def categorie_datatourisme(cl: set[str], nom: str) -> int | None:
         return C_ITINERAIRE
     if cl & CLASSES_SERVICE or (cl & CLASSES_SERVICE_SI_VELO and MOTS_VELO.search(nom or "")):
         return C_SERVICE
+    if cl & CLASSES_PARC:          # avant le patrimoine : DATAtourisme range aussi les parcs en « site culturel »
+        return C_PARC
     if cl & CLASSES_PATRIMOINE:
         return C_PATRIMOINE
-    if cl & CLASSES_PARC:
-        return C_PARC
     if cl & CLASSES_NATURE:
         return C_NATURE
     return None
@@ -122,7 +123,10 @@ def lignes_csv(chemin: Path):
             dialecte = csv.Sniffer().sniff(debut, delimiters=",;\t")
         except csv.Error:
             dialecte = csv.excel
-        yield from csv.DictReader(f, dialect=dialecte)
+        # En-têtes normalisés : « Coordonnées au format WGS84 » et « coordonnees_au_format_WGS84 »
+        # deviennent tous deux « coordonnees au format wgs84 ».
+        for ligne in csv.DictReader(f, dialect=dialecte):
+            yield {_norm(k): v for k, v in ligne.items() if k is not None}
 
 
 def _court(t, n=180) -> str:
@@ -167,17 +171,17 @@ def lire_datatourisme(chemins: list[Path], placeur: Placeur, stats: dict) -> lis
     for chemin in chemins:
         for l in lignes_csv(chemin):
             stats["datatourisme_lignes"] += 1
-            uri = l.get("URI_ID_du_POI") or ""
+            uri = l.get("uri id du poi") or ""
             if uri and uri in vus:
                 continue
-            nom = (l.get("Nom_du_POI") or "").strip()
-            cl = classes(l.get("Categories_de_POI"))
+            nom = (l.get("nom du poi") or "").strip()
+            cl = classes(l.get("categories de poi"))
             cat = categorie_datatourisme(cl, nom)
             specifiques = cl - {"pointofinterest", "placeofinterest", "thing", "product", "tour", "orderedlist"}
             (gardees if cat is not None else ecartees).update(specifiques)
             if cat is None or not nom:
                 continue
-            lat, lon = _nombre(l.get("Latitude")), _nombre(l.get("Longitude"))
+            lat, lon = _nombre(l.get("latitude")), _nombre(l.get("longitude"))
             if lat is None or lon is None:
                 continue
             dep, com = placeur.placer(lat, lon)
@@ -185,7 +189,7 @@ def lire_datatourisme(chemins: list[Path], placeur: Placeur, stats: dict) -> lis
                 continue
             vus.add(uri)
             lieux.append({"lat": lat, "lon": lon, "nom": nom, "cat": cat, "dep": dep, "com": com,
-                          "src": "DATAtourisme", "lien": uri, "desc": _court(l.get("Description")), "statut": ""})
+                          "src": "DATAtourisme", "lien": uri, "desc": _court(l.get("description")), "statut": ""})
     stats["classes_gardees"] = dict(gardees.most_common(40))
     stats["classes_ecartees"] = dict(ecartees.most_common(40))
     return lieux
@@ -195,19 +199,19 @@ def lire_merimee(chemin: Path, placeur: Placeur, stats: dict) -> list[dict]:
     lieux = []
     for l in lignes_csv(chemin):
         stats["merimee_lignes"] += 1
-        pos = coordonnees(l.get("coordonnees_au_format_WGS84"))
+        pos = coordonnees(l.get("coordonnees au format wgs84"))
         if not pos:
             continue
         dep, com = placeur.placer(*pos)
         if not dep:
             continue
-        nom = (l.get("Titre_editorial_de_la_notice") or l.get("Denomination_de_l_edifice") or "").strip()
+        nom = (l.get("titre editorial de la notice") or l.get("denomination de l edifice") or "").strip()
         if not nom:
             continue
-        protection = _norm(l.get("Typologie_de_la_protection") or l.get("Nature_de_la_protection"))
+        protection = _norm(l.get("typologie de la protection") or l.get("nature de la protection"))
         statut = "classé MH" if "class" in protection else "inscrit MH" if "inscri" in protection else "protégé MH"
-        ref = (l.get("Reference") or "").strip()
-        siecle = _court(l.get("Format_abrege_du_siecle_de_construction") or l.get("Siecle_de_la_campagne_principale_de_construction"), 60)
+        ref = (l.get("reference") or "").strip()
+        siecle = _court(l.get("format abrege du siecle de construction") or l.get("siecle de la campagne principale de construction"), 60)
         lieux.append({"lat": pos[0], "lon": pos[1], "nom": nom, "cat": C_MH, "dep": dep, "com": com,
                       "src": "Mérimée", "lien": f"https://pop.culture.gouv.fr/notice/merimee/{ref}" if ref else "",
                       "desc": siecle, "statut": statut})
@@ -218,18 +222,18 @@ def lire_museofile(chemin: Path, placeur: Placeur, stats: dict) -> list[dict]:
     lieux = []
     for l in lignes_csv(chemin):
         stats["museofile_lignes"] += 1
-        pos = coordonnees(l.get("Coordonnees"))
+        pos = coordonnees(l.get("coordonnees"))
         if not pos:
             continue
         dep, com = placeur.placer(*pos)
-        nom = (l.get("Nom_officiel") or "").strip()
+        nom = (l.get("nom officiel") or "").strip()
         if not dep or not nom:
             continue
-        url = (l.get("URL") or "").strip()
+        url = (l.get("url") or "").strip()
         if url and not url.startswith("http"):
             url = "https://" + url
         lieux.append({"lat": pos[0], "lon": pos[1], "nom": nom, "cat": C_MUSEE, "dep": dep, "com": com,
-                      "src": "Muséofile", "lien": url, "desc": _court(l.get("Atout") or l.get("Themes")),
+                      "src": "Muséofile", "lien": url, "desc": _court(l.get("atout") or l.get("themes")),
                       "statut": "musée de France"})
     return lieux
 
@@ -295,6 +299,9 @@ def calculer(client, travail: Path, codes_valides: set[str], localisateur_dep, l
             officiels += lire(client.telecharger(r["url"], travail / f"{nom}.csv"), placeur, stats)
         except Exception as e:  # une source complémentaire en panne n'empêche pas les autres
             erreurs.append(f"{nom} : {e}")
+    stats["officiels_lus"] = len(officiels)
+    if not officiels and not erreurs:
+        erreurs.append("aucun monument ni musée lu (format des fichiers à vérifier)")
     tous = dedoublonner(dt, officiels, stats)
     par_dep: dict[str, list] = {}
     for p in tous:

@@ -52,7 +52,7 @@ def test_selection_et_dedoublonnage(res):
     _, pts69 = points(sortie, "69")
     assert pts69[0]["nom"] == "Musée des Confluences" and pts69[0]["source"] == 2
     m = meta["sources"]["poi"]
-    assert m["statut"] == "ok" and "2 doublons fusionnés" in m["detail"]
+    assert m["statut"] == "ok" and "2 doublons fusionnés" in m["detail"] and "dont 4 monuments" in m["detail"]
     assert "museum" in m["classes_gardees"] and "hotel" in m["classes_ecartees"]
 
 
