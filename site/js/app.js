@@ -902,7 +902,10 @@
       if (!lieux.length) { cible.innerHTML = '<p class="note-ville">Aucun lieu recensé dans cette commune.</p>'; return; }
       var compte = f.categories.map(function () { return 0; });
       lieux.forEach(function (k) { compte[k.categorie]++; });
-      lieux.sort(function (a, b) { return priorite(a) - priorite(b) || a.nom.localeCompare(b.nom, "fr"); });
+      // À priorité égale, les lieux décrits (souvent les plus visités) passent devant
+      lieux.sort(function (a, b) {
+        return priorite(a) - priorite(b) || (b.description ? 1 : 0) - (a.description ? 1 : 0) || a.nom.localeCompare(b.nom, "fr");
+      });
       var html = '<p class="note-ville">' + compte.map(function (n, i) {
         return n ? f.categories[i] + " : " + n : null; }).filter(Boolean).join(" ; ") + ".</p><ul class=\"liste-lieux\">";
       lieux.slice(0, 8).forEach(function (k, i) {

@@ -308,8 +308,8 @@ def construire(client, sortie: Path, travail: Path, url_precedent: str | None = 
             sources_meta["poi"] = {
                 "statut": "ok", "url": "https://www.data.gouv.fr/datasets/" + poi.ID_DATATOURISME, "version": poi.VERSION,
                 "date_donnees": maintenant[:10],
-                "detail": (f"{sum(res_p['comptes'].values()):,} lieux retenus, dont {st.get('officiels_lus', 0):,} monuments "
-                           f"et musées officiels lus ; {st.get('doublons', 0):,} doublons fusionnés").replace(",", " ")
+                "detail": (f"{sum(res_p['comptes'].values()):_} lieux retenus, dont {st.get('officiels_lus', 0):_} monuments "
+                           f"et musées officiels lus ; {st.get('doublons', 0):_} doublons fusionnés").replace("_", " ")
                           + (" ; sources en échec : " + ", ".join(res_p["erreurs"]) if res_p["erreurs"] else ""),
                 "comptes": res_p["comptes"], "classes_gardees": st.get("classes_gardees"),
                 "diagnostic": {"merimee_lignes": st.get("merimee_lignes"), "museofile_lignes": st.get("museofile_lignes"),
