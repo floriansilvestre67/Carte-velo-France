@@ -108,9 +108,15 @@ def departement_de_commune(code_commune, table: dict[str, str]) -> str | None:
 
 
 def agreger(chemin_geojson: Path, table_communes: dict[str, str], localisateur,
-            codes_valides: set[str]) -> dict:
-    """Parcourt le fichier en streaming et cumule les km par département et par catégorie."""
+            codes_valides: set[str], correspondance=None) -> dict:
+    """Parcourt le fichier en streaming et cumule les km par département et par catégorie.
+
+    Si `correspondance` (communes.Correspondance) est fourni, cumule aussi les km par
+    commune actuelle entière (Paris, Lyon et Marseille regroupés). Un côté sans code
+    commune exploitable n'est compté qu'au niveau du département.
+    """
     km = {code: {c: 0.0 for c in CATEGORIES} for code in codes_valides}
+    km_communes: dict[str, dict[str, float]] = {}
     stats = {"troncons": 0, "troncons_sans_departement": 0, "km_hors_metropole": 0.0,
              "date_maj_max": None, "km_par_type_brut": {}}
 
@@ -143,18 +149,24 @@ def agreger(chemin_geojson: Path, table_communes: dict[str, str], localisateur,
                     secours = localisateur.trouver(pt[0], pt[1]) if pt else None
                 dep_d, dep_g = dep_d or secours, dep_g or secours
 
-            cotes = [(cote_d, dep_d, p.get("ame_d")), (cote_g, dep_g, p.get("ame_g"))]
+            # (catégorie, département, type brut, code commune) pour chaque côté
+            cotes = [(cote_d, dep_d, p.get("ame_d"), p.get("code_com_d") or p.get("code_com_g")),
+                     (cote_g, dep_g, p.get("ame_g"), p.get("code_com_g") or p.get("code_com_d"))]
             # Voie verte identique des deux côtés : une seule voie
             if cote_d == cote_g == "voies_vertes" and dep_d == dep_g:
                 cotes = cotes[:1]
 
-            for cat, dep, brut in cotes:
+            for cat, dep, brut, code_com in cotes:
                 if cat is None:
                     continue
                 if dep is None:
                     stats["troncons_sans_departement"] += 1
                 elif dep in km:
                     km[dep][cat] += longueur
+                    if correspondance is not None:
+                        com = correspondance.resoudre(code_com)
+                        if com:
+                            km_communes.setdefault(com, {c: 0.0 for c in CATEGORIES})[cat] += longueur
                     cle = normaliser(brut)
                     stats["km_par_type_brut"][cle] = stats["km_par_type_brut"].get(cle, 0.0) + longueur
                 else:
@@ -162,14 +174,15 @@ def agreger(chemin_geojson: Path, table_communes: dict[str, str], localisateur,
 
     if stats["troncons"] == 0:
         raise ValueError("Le fichier des aménagements ne contient aucun tronçon")
-    return {"km": km, "stats": stats}
+    return {"km": km, "km_communes": km_communes, "stats": stats}
 
 
-def calculer(client, dossier_travail: Path, table_communes, localisateur, codes_valides) -> dict:
+def calculer(client, dossier_travail: Path, table_communes, localisateur, codes_valides,
+             correspondance=None) -> dict:
     ressource = trouver_ressource(client)
     print(f"  Ressource : {ressource.get('title')} ({ressource['url']})")
     chemin = client.telecharger(ressource["url"], dossier_travail / "amenagements.geojson")
-    resultat = agreger(chemin, table_communes, localisateur, codes_valides)
+    resultat = agreger(chemin, table_communes, localisateur, codes_valides, correspondance)
     resultat["ressource"] = {"titre": ressource.get("title"), "url": ressource["url"],
                              "publiee_le": (ressource.get("last_modified") or "")[:10] or None}
     return resultat

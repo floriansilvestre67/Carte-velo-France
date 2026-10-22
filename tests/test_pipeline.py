@@ -156,7 +156,7 @@ def test_fichiers_legers(monde):
 
 
 def test_bnac_fixture_complete():
-    assert len(bnac()["features"]) == 9
+    assert len(bnac()["features"]) == 10
 
 
 def test_regions(monde):

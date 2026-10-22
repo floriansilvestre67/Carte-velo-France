@@ -17,7 +17,7 @@ import pytest
 RACINE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RACINE / "scripts"))
 
-from sources import amenagements, communes, departements, regions, vls  # noqa: E402
+from sources import accidents, amenagements, communes, departements, regions, vls  # noqa: E402
 
 CODES = [f"{i:02d}" for i in range(1, 96) if i != 20] + ["2A", "2B"]
 TAILLE = 0.5  # degrés
@@ -59,11 +59,47 @@ def liste_communes():
     liste = []
     for n, code in enumerate(CODES):
         for k in range(1, 13):
-            liste.append({"code": f"{code}{k:03d}", "codeDepartement": code,
+            liste.append({"code": f"{code}{k:03d}", "nom": f"Commune {code}-{k}", "codeDepartement": code,
                           "population": 1000 * (n + 1) + k, "surface": 2500.0})  # 25 km²
+    # Communes à arrondissements, avec leurs vrais codes
+    liste.append({"code": "75056", "nom": "Paris", "codeDepartement": "75", "population": 2100000, "surface": 10540.0})
+    liste.append({"code": "69123", "nom": "Lyon", "codeDepartement": "69", "population": 520000, "surface": 4787.0})
     liste.append({"code": "97411", "codeDepartement": "974", "population": 150000, "surface": 14000.0})
     liste.append({"code": "99999", "codeDepartement": "63", "surface": 100.0})  # sans population
     return liste
+
+
+KOUMOUL_PAGE2 = accidents.URL_LIGNES + "&after=7"
+
+
+def ligne_acc(num, an, dep, com, grav, trajet="5", situ="1", typevehicules="7", obsm="2", num_veh=1):
+    return {"Num_Acc": num, "an": an, "dep": dep, "com": com, "grav": grav, "trajet": trajet, "situ": situ,
+            "typevehicules": typevehicules, "numVehicules": num_veh, "obsm": obsm}
+
+
+def koumoul():
+    """Deux pages au format de l'API data-fair /lines, avec les cas particuliers connus."""
+    page1 = [
+        # A : deux cyclistes dans le même accident (un tué, un blessé léger), bus + voiture, sur piste
+        ligne_acc("202100000001", 2021, "63", "63001", "4", trajet="1", situ="5", typevehicules="7 / 18"),
+        ligne_acc("202100000001", 2021, "63", "63001", "2", trajet="5", situ="5", typevehicules="7 / 18"),
+        # B : Paris, ancien format « 750NN », piéton heurté, sans autre véhicule
+        ligne_acc("201000000002", 2010, "75", "75012", "3", typevehicules=None, obsm="1", num_veh=None),
+        # C : département sans zéro initial, motif et situation non renseignés (code 0), VAE en face
+        ligne_acc("201900000003", 2019, "1", "01005", "1", trajet="0", situ="0", typevehicules="80"),
+        # D : outre-mer, à écarter
+        ligne_acc("202200000004", 2022, "971", "97101", "4"),
+        # E : ancienne commune fusionnée, gravité non renseignée, poids lourd, autre voie spéciale
+        ligne_acc("201500000005", 2015, "63", "63999", "-1", situ="6", typevehicules="14"),
+        # F : Corse
+        ligne_acc("202100000006", 2021, "2A", "2A004", "4", typevehicules="33"),
+    ]
+    page2 = [
+        # G : arrondissement de Lyon
+        ligne_acc("202300000007", 2023, "69", "69383", "4", typevehicules="7"),
+    ]
+    return ({"total": 8, "next": KOUMOUL_PAGE2, "results": page1},
+            {"total": 8, "results": page2})
 
 
 def troncon(geom, **props):
@@ -84,7 +120,8 @@ def bnac():
         troncon(L("63", 0.03), ame_d="AUCUN", ame_g="AUCUN", code_com_d="63001", code_com_g="63001"),
         troncon({"type": "MultiLineString", "coordinates": [ligne("75"), ligne("75", dy=0.01)]},
                 ame_d="COULOIR BUS+VELO", code_com_d="75001", date_maj="2026-10-01"),
-        troncon(L("2A"), ame_g="PISTE CYCLABLE", code_com_g="2A099"),  # code absent de la table : repli sur le préfixe
+        troncon(L("2A"), ame_g="PISTE CYCLABLE", code_com_g="2A099"),
+        troncon(L("75", 0.02), ame_d="PISTE CYCLABLE", code_com_d="75108"),  # arrondissement -> Paris  # code absent de la table : repli sur le préfixe
         troncon(L("01"), ame_d="PISTE CYCLABLE", code_com_d="97411"),  # outre-mer : ignoré
         troncon(None, ame_d="PISTE CYCLABLE", code_com_d="63001"),     # géométrie vide
     ]}
@@ -110,6 +147,13 @@ def monde(tmp_path):
     urls = {}
     urls[departements.URL_CONTOURS] = ecrire(d, "contours.geojson", contours())
     urls[communes.URL_COMMUNES] = ecrire(d, "communes.json", liste_communes())
+    urls[communes.URL_DELEGUEES] = ecrire(d, "deleguees.json", [
+        {"code": "63999", "nom": "Ancienne commune", "chefLieu": "63001"},
+        {"code": "63001", "nom": "Chef-lieu lui-même", "chefLieu": "63001"}])
+    p1, p2 = koumoul()
+    urls[accidents.URL_LIGNES] = ecrire(d, "koumoul1.json", p1)
+    urls[KOUMOUL_PAGE2] = ecrire(d, "koumoul2.json", p2)
+    urls[accidents.URL_JEU] = ecrire(d, "koumoul_meta.json", {"count": 8, "dataUpdatedAt": "2026-09-07T13:26:45Z"})
     # 13 régions fictives ; le 63 et le 69 sont dans la même (84), comme en vrai
     regs = [{"code": f"R{i}", "nom": f"Région {i}"} for i in range(12)] + [{"code": "84", "nom": "Auvergne-Rhône-Alpes"}]
     deps_api = [{"code": c, "nom": f"Département {c}",

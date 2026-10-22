@@ -10,10 +10,18 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap">
   <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/statistiques.css">
 </head>
 <body>
+  <header class="bandeau">
+    <a class="marque" href="./"><span class="pastille" aria-hidden="true"></span>Carte Vélo France</a>
+    <nav aria-label="Navigation principale">
+      <a href="./">Carte</a>
+      <a href="statistiques.html">Statistiques</a>
+      <a href="methode.html" aria-current="page">Sources et méthode</a>
+    </nav>
+  </header>
   <main class="page-texte">
-    <a class="retour" href="./">Retour à la carte</a>
     <h1>Sources et méthode</h1>
     <p>Tous les chiffres de la carte sont calculés automatiquement chaque jour à partir de données ouvertes. Quand une donnée manque, elle est affichée comme indisponible : rien n'est estimé ni inventé.</p>
 
@@ -84,6 +92,26 @@
     <p>Pour chaque indicateur, les départements sont classés et reçoivent un rang centile : 100 pour le premier, 0 pour le dernier, les autres régulièrement entre les deux. Les ex æquo reçoivent la moyenne de leurs rangs. Le score est la moyenne de ces six rangs centiles.</p>
     <p>Exemple : un département premier sur trois indicateurs (100), et au milieu du classement sur les trois autres (50), obtient (3 × 100 + 3 × 50) ÷ 6 = 75.</p>
     <p>Le score mesure une position relative entre départements, pas une qualité absolue. Il mélange volontairement des totaux, qui favorisent les grands départements, et des chiffres rapportés à la population ou à la surface, qui favorisent les départements urbains. Si une source est indisponible, le score est calculé sur les indicateurs restants et la fiche du département le signale.</p>
+
+    <h2 id="accidents">Accidents de vélo</h2>
+    <h3>Source</h3>
+    <p>Jeu <a href="https://opendata.koumoul.com/datasets/accidents-velos">« Accidents de vélo »</a> publié sur Koumoul, construit à partir des <a href="https://www.data.gouv.fr/datasets/bases-de-donnees-annuelles-des-accidents-corporels-de-la-circulation-routiere-annees-de-2005-a-2024/">fichiers annuels des accidents corporels (BAAC)</a> de l'Observatoire national interministériel de la sécurité routière (ONISR), Licence Ouverte. Les codes sont décodés selon la <a href="https://static.data.gouv.fr/resources/bases-de-donnees-annuelles-des-accidents-corporels-de-la-circulation-routiere-annees-de-2005-a-2024/20251021-115933/description-des-bases-de-donnees-annuelles.pdf">description officielle des bases de données annuelles</a>. Seule la France métropolitaine est retenue.</p>
+    <h3>Ce qui est compté</h3>
+    <ul>
+      <li>Chaque ligne de la source est un cycliste impliqué dans un accident corporel. Un accident est compté une seule fois (identifiant d'accident distinct), même s'il implique plusieurs cyclistes.</li>
+      <li>Les victimes sont les cyclistes : tués, blessés hospitalisés, blessés légers. Les cyclistes indemnes sont comptés à part. Les autres personnes impliquées (automobilistes, piétons…) ne le sont pas.</li>
+      <li>La gravité d'un accident est celle du cycliste le plus gravement atteint. Son motif de déplacement est celui de ce même cycliste.</li>
+      <li>Quand plusieurs véhicules sont en cause, le plus lourd est retenu (poids lourd, puis transport en commun, utilitaire, voiture, deux-roues motorisé, vélo, trottinette). Un accident sans autre véhicule mais avec un piéton heurté est classé « Piéton ».</li>
+      <li>Les codes commune sont harmonisés : départements sans zéro initial, anciens codes de Paris (« 750NN »), communes fusionnées depuis 2005 rattachées à leur commune actuelle. Paris, Lyon et Marseille sont regroupés, avec un détail par arrondissement.</li>
+    </ul>
+    <h3>Ruptures de série</h3>
+    <ul>
+      <li><strong>À partir de 2018</strong>, la source compte nettement moins de cyclistes que les bilans officiels (156 tués en 2023 contre 226 selon l'ONISR). Elle semble ne pas inclure les vélos à assistance électrique, codés à part depuis 2018. Les années récentes sont sous-estimées et ne se comparent pas aux précédentes. La source s'arrête en 2023.</li>
+      <li><strong>Depuis 2019</strong>, l'indicateur « blessé hospitalisé » n'est plus labellisé comme statistique publique par l'ONISR.</li>
+      <li><strong>Depuis 2019</strong>, les situations « autre voie spéciale » et « autre » existent ; avant, le code 0 servait aussi pour « non renseigné ». Les motifs de déplacement sont non renseignés pour environ 21 % des cyclistes avant 2019.</li>
+    </ul>
+    <h3>Rapports et corrélations</h3>
+    <p>Les accidents sont rapportés à la population (pour 100 000 habitants) et aux kilomètres d'aménagements cyclables (pour 100 km), en moyenne par an sur la période choisie. La population et les kilomètres sont les valeurs actuelles, même pour les années anciennes. Les corrélations utilisent les coefficients de Pearson (relation linéaire) et de Spearman (relation de rang, moins sensible aux valeurs extrêmes comme Paris). Elles ne prouvent aucun lien de cause à effet : plus de cyclistes entraîne à la fois plus d'aménagements et plus d'accidents.</p>
 
     <h2>Limites</h2>
     <ul>

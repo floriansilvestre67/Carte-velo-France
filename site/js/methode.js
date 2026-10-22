@@ -6,7 +6,8 @@
     communes: "Population et surface",
     regions: "Régions",
     amenagements: "Aménagements cyclables",
-    vls: "Vélos en libre-service"
+    vls: "Vélos en libre-service",
+    accidents: "Accidents de vélo"
   };
   // Même regroupement que scripts/sources/amenagements.py
   function categorie(t) {

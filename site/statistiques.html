@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Statistiques des accidents de vélo – Carte Vélo France</title>
+  <meta name="description" content="Accidents de vélo en France métropolitaine depuis 2005 : évolution, véhicules impliqués, motifs, situations, rapports aux aménagements et à la population.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='7' fill='%230e7c5a'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/statistiques.css">
+</head>
+<body class="page-stats">
+  <a class="lien-evitement" href="#contenu">Aller au contenu</a>
+
+  <header class="bandeau">
+    <a class="marque" href="./"><span class="pastille" aria-hidden="true"></span>Carte Vélo France</a>
+    <nav aria-label="Navigation principale">
+      <a href="./" id="lien-carte">Carte</a>
+      <a href="statistiques.html" aria-current="page">Statistiques</a>
+      <a href="methode.html">Sources et méthode</a>
+    </nav>
+  </header>
+
+  <form class="filtres" id="filtres" aria-label="Filtres appliqués à tous les graphiques" onsubmit="return false">
+    <div class="filtre">
+      <label for="f-region">Région</label>
+      <select id="f-region"><option value="">France métropolitaine</option></select>
+    </div>
+    <div class="filtre">
+      <label for="f-dep">Département</label>
+      <select id="f-dep"><option value="">Tous</option></select>
+    </div>
+    <div class="filtre">
+      <label for="f-ville">Commune</label>
+      <select id="f-ville" disabled><option value="">Toutes</option></select>
+    </div>
+    <div class="filtre" id="bloc-arr" hidden>
+      <label for="f-arr">Arrondissement</label>
+      <select id="f-arr"><option value="">Toute la commune</option></select>
+    </div>
+    <div class="filtre filtre-annees">
+      <span class="libelle-groupe" id="lib-periode">Période</span>
+      <div role="group" aria-labelledby="lib-periode">
+        <label class="visuellement-cache" for="f-debut">Année de début</label>
+        <select id="f-debut"></select>
+        <span aria-hidden="true">à</span>
+        <label class="visuellement-cache" for="f-fin">Année de fin</label>
+        <select id="f-fin"></select>
+      </div>
+    </div>
+  </form>
+
+  <main id="contenu" class="stats" tabindex="-1">
+    <div class="titre-zone">
+      <h1 id="titre">Accidents de vélo</h1>
+      <p id="sous-titre" class="sous-titre">Chargement des données…</p>
+    </div>
+
+    <div id="alertes" class="alertes" aria-live="polite"></div>
+
+    <section class="chiffres" id="chiffres" aria-label="Chiffres clés de la période"></section>
+
+    <section class="bloc" aria-labelledby="t-evolution">
+      <h2 id="t-evolution">Évolution annuelle</h2>
+      <p class="aide" id="aide-evolution"></p>
+      <div class="deux-graphes">
+        <figure>
+          <figcaption>Accidents et cyclistes blessés</figcaption>
+          <div class="cadre-graphe"><canvas id="g-evolution" role="img" aria-label="Évolution annuelle du nombre d'accidents et de cyclistes blessés"></canvas></div>
+        </figure>
+        <figure>
+          <figcaption>Cyclistes tués</figcaption>
+          <div class="cadre-graphe"><canvas id="g-tues" role="img" aria-label="Évolution annuelle du nombre de cyclistes tués"></canvas></div>
+        </figure>
+      </div>
+      <details><summary>Voir les données</summary><div class="table-defile" id="d-evolution"></div></details>
+    </section>
+
+    <section class="bloc" aria-labelledby="t-vehicules">
+      <h2 id="t-vehicules">Avec quoi les cyclistes entrent en collision</h2>
+      <p class="aide">Nombre d'accidents selon l'autre usager impliqué et la gravité pour le cycliste. Quand plusieurs véhicules sont en cause, c'est le plus lourd qui est retenu.</p>
+      <figure>
+        <div class="cadre-graphe haut"><canvas id="g-vehicules" role="img" aria-label="Accidents selon l'autre usager impliqué, empilés par gravité"></canvas></div>
+      </figure>
+      <details><summary>Voir les données</summary><div class="table-defile" id="d-vehicules"></div></details>
+    </section>
+
+    <div class="deux-blocs">
+      <section class="bloc" aria-labelledby="t-motifs">
+        <h2 id="t-motifs">Motif du déplacement</h2>
+        <p class="aide">Motif déclaré du cycliste le plus gravement atteint.</p>
+        <figure>
+          <div class="cadre-graphe"><canvas id="g-motifs" role="img" aria-label="Nombre d'accidents par motif de déplacement"></canvas></div>
+        </figure>
+        <details><summary>Voir les données</summary><div class="table-defile" id="d-motifs"></div></details>
+      </section>
+
+      <section class="bloc" aria-labelledby="t-situ">
+        <h2 id="t-situ">Où a lieu l'accident</h2>
+        <p class="aide">Situation de l'accident, par gravité pour le cycliste.</p>
+        <figure>
+          <div class="cadre-graphe"><canvas id="g-situ" role="img" aria-label="Accidents par situation, empilés par gravité"></canvas></div>
+        </figure>
+        <details><summary>Voir les données</summary><div class="table-defile" id="d-situ"></div></details>
+      </section>
+    </div>
+
+    <section class="bloc" aria-labelledby="t-piste" id="bloc-piste">
+      <h2 id="t-piste">Part des accidents sur piste cyclable</h2>
+      <figure>
+        <div class="cadre-graphe bas"><canvas id="g-piste" role="img" aria-label="Évolution de la part des accidents survenus sur piste cyclable"></canvas></div>
+      </figure>
+      <details><summary>Voir les données</summary><div class="table-defile" id="d-piste"></div></details>
+    </section>
+
+    <section class="bloc" aria-labelledby="t-ratios">
+      <h2 id="t-ratios">Accidents rapportés à la population et aux aménagements</h2>
+      <p class="aide" id="aide-ratios"></p>
+      <div class="table-defile">
+        <table class="classable" id="t-ratios-table"></table>
+      </div>
+    </section>
+
+    <section class="bloc" aria-labelledby="t-correl">
+      <h2 id="t-correl">Corrélations</h2>
+      <div class="onglets" role="tablist" aria-label="Niveau des corrélations">
+        <button type="button" role="tab" id="niv-dep" aria-selected="true" aria-controls="correl">Départements</button>
+        <button type="button" role="tab" id="niv-com" aria-selected="false" aria-controls="correl">Communes de plus de 10 000 habitants</button>
+      </div>
+      <p class="aide" id="aide-correl"></p>
+      <div id="correl" role="tabpanel" class="trois-graphes">
+        <figure>
+          <figcaption>Accidents par an et km d'aménagements</figcaption>
+          <div class="cadre-graphe carre"><canvas id="g-c1" role="img" aria-label="Nuage de points : accidents par an selon les km d'aménagements cyclables"></canvas></div>
+          <p class="coef" id="coef-1"></p>
+        </figure>
+        <figure>
+          <figcaption>Accidents par an et population</figcaption>
+          <div class="cadre-graphe carre"><canvas id="g-c2" role="img" aria-label="Nuage de points : accidents par an selon la population"></canvas></div>
+          <p class="coef" id="coef-2"></p>
+        </figure>
+        <figure>
+          <figcaption>Accidents pour 100 000 hab. et km pour 10 000 hab.</figcaption>
+          <div class="cadre-graphe carre"><canvas id="g-c3" role="img" aria-label="Nuage de points : accidents pour 100 000 habitants selon les km d'aménagements pour 10 000 habitants"></canvas></div>
+          <p class="coef" id="coef-3"></p>
+        </figure>
+      </div>
+      <p class="interpretation">Une corrélation ne prouve pas une causalité. Là où l'on pédale beaucoup, on construit plus d'aménagements et on compte aussi plus d'accidents, simplement parce qu'il y a plus de cyclistes. Sans données sur le nombre de cyclistes, ces nuages ne disent pas si les aménagements rendent le vélo plus sûr.</p>
+      <details><summary>Voir les données</summary><div class="table-defile" id="d-correl"></div></details>
+    </section>
+
+    <footer class="pied-stats">
+      <p id="source-acc">Source : jeu « Accidents de vélo » (Koumoul), construit à partir des fichiers BAAC de l'ONISR, Licence Ouverte.</p>
+      <p><a href="methode.html#accidents">Méthode de calcul et limites</a></p>
+    </footer>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+  <script src="js/statistiques.js"></script>
+</body>
+</html>

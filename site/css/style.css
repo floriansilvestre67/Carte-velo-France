@@ -77,6 +77,8 @@ a:hover { color: var(--vert); }
   background: var(--vert); margin-right: 0.3em; vertical-align: 0.05em;
 }
 .entete p { margin: 0; color: var(--encre-douce); font-size: 0.92rem; }
+.nav-panneau { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 10px; font-size: 0.92rem; }
+.nav-panneau a[aria-current="page"] { color: var(--encre); font-weight: 700; text-decoration: none; }
 
 label.titre-champ { display: block; font-weight: 700; margin-bottom: 6px; }
 

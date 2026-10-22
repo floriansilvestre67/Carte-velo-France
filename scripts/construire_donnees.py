@@ -5,8 +5,10 @@
   2. population et surface       (geo.api.gouv.fr)
   3. aménagements cyclables      (data.gouv.fr, schéma BNAC)
   4. vélos en libre-service      (flux GBFS de transport.data.gouv.fr)
-  5. indicateurs, rangs et score vélo
-  6. écriture de departements.geojson, stations.json et meta.json
+  5. accidents de vélo            (Koumoul / ONISR)
+  6. indicateurs, rangs et score vélo
+  7. écriture des fichiers : departements.geojson, stations.json, meta.json,
+     accidents/national.json et communes/{département}.json
 
 Si une source (2, 3 ou 4) est en panne, on reprend ses chiffres dans la version
 déjà publiée du site (SITE_PRECEDENT_URL) ; s'il n'y en a pas, la donnée est
@@ -26,7 +28,7 @@ from pathlib import Path
 
 import indicateurs
 from reseau import ClientHTTP
-from sources import amenagements, communes, departements, regions, vls
+from sources import accidents, amenagements, communes, departements, regions, vls
 
 TAILLE_MAX = 50 * 1024 * 1024  # 50 Mo par fichier publié
 
@@ -34,6 +36,7 @@ CLES_AMENAGEMENTS = ["km_total"] + [f"km_{c}" for c in amenagements.CATEGORIES]
 CLES_VLS = ["vls_stations", "vls_velos"]
 CLES_COMMUNES = ["population", "surface_km2"]
 CLES_REGIONS = ["region", "region_nom"]
+SEUIL_GRANDES_COMMUNES = 10_000  # habitants : communes retenues pour les corrélations nationales
 
 
 def journal(message: str) -> None:
@@ -58,6 +61,26 @@ def charger_precedent(client, url_base: str | None) -> dict | None:
     except Exception:
         pass
     return precedent
+
+
+def ecrire_json(chemin: Path, contenu) -> int:
+    chemin.parent.mkdir(parents=True, exist_ok=True)
+    with open(chemin, "w", encoding="utf-8") as f:
+        json.dump(contenu, f, ensure_ascii=False, separators=(",", ":"))
+    taille = chemin.stat().st_size
+    if taille > TAILLE_MAX:
+        raise RuntimeError(f"{chemin.name} dépasse 50 Mo ({taille / 1e6:.1f} Mo)")
+    return taille
+
+
+def fichier_precedent(client, url_base: str | None, chemin_relatif: str):
+    """Un fichier de données de la version en ligne, ou None."""
+    if not url_base:
+        return None
+    try:
+        return client.get_json(url_base.rstrip("/") + "/data/" + chemin_relatif)
+    except Exception:
+        return None
 
 
 def reprendre(precedent, cles, nom_source):
@@ -106,9 +129,15 @@ def construire(client, sortie: Path, travail: Path, url_precedent: str | None = 
     # 2. Communes
     journal("2/5 Population et surface (geo.api.gouv.fr)…")
     table_communes: dict[str, str] = {}
+    liste_communes: list[dict] = []
+    correspondance = None
     try:
         liste = communes.charger_communes(client)
+        liste_communes = liste
         table_communes = communes.correspondance_commune_departement(liste)
+        anciennes = communes.charger_anciennes(client)
+        correspondance = communes.Correspondance(liste, anciennes)
+        journal(f"  {len(liste)} communes, {len(anciennes)} anciennes communes rattachées")
         agg = communes.agreger_par_departement(liste)
         for code in codes:
             a = agg.get(code) or {}
@@ -136,9 +165,11 @@ def construire(client, sortie: Path, travail: Path, url_precedent: str | None = 
         appliquer_secours("regions", CLES_REGIONS, e)
 
     # 3. Aménagements
+    km_communes: dict[str, dict] | None = None
     journal("3/5 Aménagements cyclables (data.gouv.fr)…")
     try:
-        res = amenagements.calculer(client, travail, table_communes, localisateur, codes)
+        res = amenagements.calculer(client, travail, table_communes, localisateur, codes, correspondance)
+        km_communes = res["km_communes"]
         for code in codes:
             km = res["km"][code]
             for cat in amenagements.CATEGORIES:
@@ -184,10 +215,32 @@ def construire(client, sortie: Path, travail: Path, url_precedent: str | None = 
         if appliquer_secours("vls", CLES_VLS, e) and precedent and precedent.get("stations"):
             stations_carte = precedent["stations"]
 
-    # 5. Indicateurs
-    journal("5/5 Indicateurs et score…")
+    # 5. Accidents de vélo
+    journal("5/6 Accidents de vélo (Koumoul / ONISR)…")
+    accs = None
+    try:
+        info = accidents.metadonnees(client)
+        res_acc = accidents.construire_accidents(accidents.lire_lignes(client), codes, correspondance)
+        accs = res_acc["accidents"]
+        st = res_acc["stats"]
+        annees = sorted({a["an"] for a in accs})
+        sources_meta["accidents"] = {
+            "statut": "ok", "url": accidents.URL_PAGE_JEU, "date_donnees": info["maj"],
+            "detail": f"{st['accidents']:,} accidents ({st['lignes']:,} cyclistes) de {annees[0]} à {annees[-1]} ; "
+                      f"{st.get('lignes_hors_metropole', 0):,} lignes hors métropole écartées".replace(",", " ")}
+        journal(f"  {st}")
+    except Exception as e:
+        journal(f"  ✗ {e}")
+        traceback.print_exc()
+
+    # 6. Indicateurs
+    journal("6/6 Indicateurs et score…")
     liste_props = indicateurs.calculer([props[d["code"]] for d in deps])
     par_code = {p["code"]: p for p in liste_props}
+    region_de = {c: p.get("region") for c, p in par_code.items()}
+
+    ecrire_accidents_et_communes(client, sortie, url_precedent, sources_meta, deps, par_code, region_de,
+                                 liste_communes, correspondance, km_communes, accs)
 
     geojson = {"type": "FeatureCollection", "features": [
         {"type": "Feature", "properties": par_code[d["code"]], "geometry": d["geometrie"]} for d in deps]}
@@ -196,14 +249,130 @@ def construire(client, sortie: Path, travail: Path, url_precedent: str | None = 
 
     fichiers = {"departements.geojson": geojson, "stations.json": stations_carte, "meta.json": meta}
     for nom, contenu in fichiers.items():
-        chemin = sortie / nom
-        with open(chemin, "w", encoding="utf-8") as f:
-            json.dump(contenu, f, ensure_ascii=False, separators=(",", ":"))
-        taille = chemin.stat().st_size
-        journal(f"  → {chemin} ({taille / 1024:.0f} Ko)")
-        if taille > TAILLE_MAX:
-            raise RuntimeError(f"{nom} dépasse 50 Mo ({taille / 1e6:.1f} Mo)")
+        taille = ecrire_json(sortie / nom, contenu)
+        journal(f"  → {sortie / nom} ({taille / 1024:.0f} Ko)")
     return meta
+
+
+def ecrire_accidents_et_communes(client, sortie, url_precedent, sources_meta, deps, par_code, region_de,
+                                 liste_communes, correspondance, km_communes, accs) -> None:
+    """Écrit accidents/national.json et communes/{dep}.json.
+
+    Chaque composante manquante aujourd'hui (liste des communes, km par commune,
+    accidents) est reprise de la version en ligne si elle existe.
+    """
+    codes = [d["code"] for d in deps]
+
+    # --- Communes : nom, population, surface, km d'aménagements ---
+    par_dep: dict[str, dict] = {c: {} for c in codes}
+    for c in liste_communes:
+        dep = c.get("codeDepartement")
+        if dep in par_dep:
+            par_dep[dep][c["code"]] = {
+                "n": c.get("nom"), "p": c.get("population"),
+                "s": round(c["surface"] / 100, 2) if isinstance(c.get("surface"), (int, float)) else None}
+    if km_communes is not None:
+        for code_com, km in km_communes.items():
+            dep = correspondance.departement(code_com) if correspondance else None
+            if dep in par_dep and code_com in par_dep[dep]:
+                par_dep[dep][code_com]["km"] = {k: round(v, 2) for k, v in km.items() if v}
+                par_dep[dep][code_com]["km"]["t"] = round(sum(km.values()), 2)
+        # Communes sans aucun aménagement recensé : 0 km (et non « indisponible »)
+        for dep in par_dep:
+            for fiche in par_dep[dep].values():
+                fiche.setdefault("km", {"t": 0})
+
+    precedents: dict[str, dict] = {}
+
+    def precedent_dep(dep):
+        if dep not in precedents:
+            precedents[dep] = fichier_precedent(client, url_precedent, f"communes/{dep}.json") or {}
+        return precedents[dep]
+
+    # --- Accidents ---
+    national = None
+    if accs:
+        agg = accidents.agreger(accs, region_de)
+        annees = agg["annees"]
+        par_commune = accidents.compter_par_commune(accs, correspondance, annees)
+        national = {"annees": annees,
+                    "libelles": {"gravite": accidents.GRAVITES, "vehicule": accidents.VEHICULES,
+                                 "trajet": accidents.TRAJETS, "situ": accidents.SITUATIONS},
+                    "ruptures": accidents.RUPTURES, "zones": agg["zones"]}
+    else:
+        national = fichier_precedent(client, url_precedent, "accidents/national.json")
+        if national:
+            ancienne = sources_meta.get("accidents") or {}
+            sources_meta["accidents"] = {**ancienne, "statut": "reprise",
+                                         "detail": "Source injoignable aujourd'hui : chiffres repris de la "
+                                                   "mise à jour précédente."}
+        else:
+            sources_meta["accidents"] = {"statut": "indisponible", "detail": "Source injoignable."}
+
+    # --- Fichiers par département ---
+    total = 0
+    for dep in codes:
+        communes_dep = par_dep[dep]
+        ancien = None
+        if not communes_dep:                          # geo.api en panne
+            ancien = precedent_dep(dep)
+            communes_dep = ancien.get("communes") or {}
+        elif km_communes is None:                      # aménagements en panne
+            ancien = precedent_dep(dep)
+            for code_com, fiche in communes_dep.items():
+                km = ((ancien.get("communes") or {}).get(code_com) or {}).get("km")
+                if km is not None:
+                    fiche["km"] = km
+        if accs:
+            lignes = [accidents.enregistrement(a, correspondance) for a in accs if a["dep"] == dep]
+        else:
+            lignes = ((precedent_dep(dep).get("accidents") or {}).get("lignes")) or []
+        contenu = {"dep": dep, "communes": communes_dep,
+                   "accidents": {"champs": accidents.CHAMPS_ENREGISTREMENT, "lignes": lignes}}
+        total += ecrire_json(sortie / "communes" / f"{dep}.json", contenu)
+    journal(f"  → communes/*.json ({total / 1024:.0f} Ko au total)")
+
+    if not national:
+        return
+
+    # Informations par zone pour les ratios (population et km actuels)
+    def somme(cles, cle):
+        vals = [par_code[c].get(cle) for c in cles]
+        return None if any(v is None for v in vals) else round(sum(vals), 2)
+
+    infos = {"FR": {"nom": "France métropolitaine", "pop": somme(codes, "population"),
+                    "km": somme(codes, "km_total")}}
+    for c in codes:
+        p = par_code[c]
+        infos["D" + c] = {"nom": p["nom"], "pop": p.get("population"), "km": p.get("km_total"),
+                          "parent": "R" + p["region"] if p.get("region") else None}
+    regions_vues = {}
+    for c in codes:
+        if par_code[c].get("region"):
+            regions_vues.setdefault(par_code[c]["region"], {"nom": par_code[c]["region_nom"], "deps": []})["deps"].append(c)
+    for r, v in regions_vues.items():
+        infos["R" + r] = {"nom": v["nom"], "pop": somme(v["deps"], "population"), "km": somme(v["deps"], "km_total")}
+    national["zones_info"] = infos
+
+    # Grandes communes (corrélations) : population, km et accidents par année
+    if accs and liste_communes:
+        grandes = {}
+        for dep in codes:
+            for code_com, fiche in par_dep[dep].items():
+                if (fiche.get("p") or 0) < SEUIL_GRANDES_COMMUNES:
+                    continue
+                cpt = par_commune.get(code_com) or {"acc": [0] * len(national["annees"]),
+                                                    "tues": [0] * len(national["annees"]),
+                                                    "blesses": [0] * len(national["annees"])}
+                grandes[code_com] = {"n": fiche["n"], "d": dep, "p": fiche["p"],
+                                     "km": (fiche.get("km") or {}).get("t"), **cpt}
+        national["grandes_communes"] = grandes
+    else:
+        ancien = fichier_precedent(client, url_precedent, "accidents/national.json") or {}
+        national["grandes_communes"] = national.get("grandes_communes") or ancien.get("grandes_communes") or {}
+
+    taille = ecrire_json(sortie / "accidents" / "national.json", national)
+    journal(f"  → accidents/national.json ({taille / 1024:.0f} Ko)")
 
 
 def resume_github(meta: dict) -> None:
