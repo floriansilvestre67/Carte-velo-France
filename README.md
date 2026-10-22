@@ -66,6 +66,7 @@ site/
 | Contours des communes | [Etalab, contours administratifs](https://etalab-datasets.geo.data.gouv.fr/contours-administratifs/latest/geojson/) | Licence Ouverte |
 | Accidents de vélo | [Koumoul « Accidents de vélo »](https://opendata.koumoul.com/datasets/accidents-velos), d'après les BAAC de l'ONISR | Licence Ouverte |
 | Stationnement (indicateurs) | [Ecolab, places de stationnement vélo](https://www.data.gouv.fr/datasets/nombre-de-places-de-stationnement-velo) et [places sécurisées](https://www.data.gouv.fr/datasets/nombre-de-places-de-stationnement-velo-securisees-type-accroche-cadre-et-roue-ou-cadre-pour-1000-hab) | ODbL |
+| Lieux à visiter | [DATAtourisme](https://www.data.gouv.fr/datasets/5b598be088ee387c0c353714), [Monuments historiques (Mérimée)](https://www.data.gouv.fr/datasets/immeubles-proteges-au-titre-des-monuments-historiques-2), [Musées de France (Muséofile)](https://www.data.gouv.fr/datasets/musees-de-france-base-museofile) | Licence Ouverte |
 | Stationnement (emplacements) | [Stationnements cyclables issus d'OpenStreetMap](https://www.data.gouv.fr/datasets/stationnements-cyclables-issus-dopenstreetmap) | ODbL |
 | Fonds de carte | OpenStreetMap, CyclOSM, © contributeurs OpenStreetMap | ODbL |
 

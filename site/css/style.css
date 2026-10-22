@@ -233,6 +233,28 @@ input[type="search"] {
 .legende-stat i.pt-secu { background: #1f2a2e; }
 .legende-stat i.pt-simple { background: #fff; margin-left: 6px; }
 
+.icone-poi span {
+  width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(31, 42, 46, 0.3);
+}
+.icone-poi svg { width: 14px; height: 14px; fill: none; stroke: #fff; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.cluster-poi {
+  background: rgba(98, 80, 214, 0.9); color: #fff; border: 2px solid #fff; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.78rem;
+}
+.legende-poi { display: flex !important; flex-wrap: wrap; gap: 4px 10px; margin-top: 4px; }
+.legende-poi span, .liste-lieux i { display: inline-flex; align-items: center; gap: 4px; }
+.legende-poi i, .liste-lieux i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: none; }
+.desc-poi { color: var(--encre-douce); }
+.liste-lieux { list-style: none; margin: 6px 0; padding: 0; }
+.liste-lieux button {
+  width: 100%; display: grid; grid-template-columns: 14px 1fr; column-gap: 8px; align-items: baseline;
+  font: inherit; font-size: 0.9rem; text-align: left; background: none; border: 0; padding: 5px 4px;
+  border-radius: 4px; cursor: pointer; color: var(--encre);
+}
+.liste-lieux button:hover { background: var(--fond); }
+.liste-lieux .cat-lieu { grid-column: 2; font-size: 0.8rem; color: var(--encre-douce); }
+
 /* ---------- Page « Sources et méthode » ---------- */
 
 .page-texte { max-width: 72ch; margin: 0 auto; padding: 32px 20px 64px; }

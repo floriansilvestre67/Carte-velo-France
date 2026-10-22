@@ -638,11 +638,13 @@
         "</tbody></table></details>";
       html += '<p class="note-ville">À partir de 2018, la source sous-estime les accidents (vélos électriques probablement absents).</p>';
     }
+    html += '<h3 class="titre-section-ville">Lieux à voir</h3><div id="lieux-ville"><p class="indispo">Chargement…</p></div>';
     var st = new URLSearchParams({ ville: code });
     if (etat.arr) st.set("arr", etat.arr);
     html += '<p><a class="lien-stats-ville" href="statistiques.html?' + st.toString() + '">Voir toutes les statistiques de cette ville</a></p>';
     $("fiche-ville").innerHTML = html;
     $("fermer-ville").addEventListener("click", function () { choisirVille(null); });
+    dessinerLieuxVille(f.dep, code);
     var sel = $("annee-ville");
     if (sel) {
       sel.value = etat.anneeVille;
@@ -807,6 +809,129 @@
     majStationnement();
   }
 
+  // ---------------------------------------------------------------- lieux à visiter
+
+  // Couleurs catégorielles validées (outil dataviz) ; le pictogramme porte aussi la catégorie.
+  var POI_COULEURS = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6"];
+  var POI_PICTOS = [
+    '<path d="M3 13h10M4 6h8M5 6v6M8 6v6M11 6v6M3 6l5-3 5 3" />',                 // musée : colonnes
+    '<path d="M3 13V6l2-1v2l2-1v2l2-1V6l2-1v8M3 13h10" />',                        // monument : créneaux
+    '<path d="M8 2v3M6.5 3.5h3M4 13V8l4-3 4 3v5M7 13v-3h2v3" />',                    // patrimoine : chapelle
+    '<path d="M8 13v-3M8 10c-3 0-4-2-4-4 0-2 2-4 4-4s4 2 4 4c0 2-1 4-4 4z" />',     // parc : arbre
+    '<path d="M2 13l4-7 3 4 2-3 3 6z" />',                                         // nature : montagne
+    '<circle cx="4.5" cy="10.5" r="2.5"/><circle cx="11.5" cy="10.5" r="2.5"/><path d="M4.5 10.5L7 6h3l1.5 4.5M7 6l1 4.5" />', // vélo
+    '<path d="M10 3a3 3 0 0 0-3 4L3 11l2 2 4-4a3 3 0 0 0 4-3l-2 1-1-1 1-2z" />'      // clé
+  ];
+
+  function iconePoi(cat) {
+    return L.divIcon({ className: "icone-poi", iconSize: [26, 26], iconAnchor: [13, 13], popupAnchor: [0, -12],
+      html: '<span style="background:' + POI_COULEURS[cat] + '"><svg viewBox="0 0 16 16" aria-hidden="true">' +
+            POI_PICTOS[cat] + "</svg></span>" });
+  }
+
+  var poiCharges = {};
+
+  function popupPoi(f, p) {
+    var k = {}; f.champs.forEach(function (c, i) { k[c] = p[i]; });
+    var lien = k.lien && /^https?:\/\//.test(k.lien) ? '<br><a href="' + echapper(k.lien) + '" target="_blank" rel="noopener">En savoir plus</a>' : "";
+    return "<strong>" + echapper(k.nom) + "</strong><br>" + echapper(f.categories[k.categorie]) +
+      (k.statut ? ", " + echapper(k.statut) : "") +
+      (k.description ? '<br><span class="desc-poi">' + echapper(k.description) + "</span>" : "") + lien +
+      "<br><small>Source : " + echapper(f.sources[k.source]) + "</small>";
+  }
+
+  function calquePoi() {
+    if (!etat.calquePoi) {
+      etat.calquePoi = L.markerClusterGroup({
+        chunkedLoading: true, showCoverageOnHover: false, maxClusterRadius: 50, disableClusteringAtZoom: 16,
+        attribution: "Lieux : DATAtourisme, Ministère de la Culture (Mérimée, Muséofile)",
+        iconCreateFunction: function (c) {
+          var n = c.getChildCount(), taille = n < 100 ? 30 : n < 1000 ? 38 : 46;
+          return L.divIcon({ html: "<span>" + n + "</span>", className: "cluster-poi", iconSize: [taille, taille] });
+        }
+      });
+    }
+    return etat.calquePoi;
+  }
+
+  function chargerPoi(dep) {
+    if (poiCharges[dep]) return poiCharges[dep];
+    poiCharges[dep] = fichierDep("poi/" + dep + ".json").then(function (f) {
+      calquePoi().addLayers(f.points.map(function (p) {
+        var m = L.marker([p[0], p[1]], { icon: iconePoi(p[3]), title: p[2], keyboard: true });
+        m.bindPopup(function () { return popupPoi(f, p); });
+        m._cle = p[0] + "," + p[1] + "," + p[2];
+        return m;
+      }));
+      return f;
+    });
+    poiCharges[dep].catch(function () { delete poiCharges[dep]; });
+    return poiCharges[dep];
+  }
+
+  function majPoi() {
+    if (!$("calque-poi").checked) return;
+    var info = $("poi-info");
+    if (carte.getZoom() < ZOOM_STAT && !etat.ville) { info.textContent = "Zoomez sur une ville pour afficher les lieux."; return; }
+    var deps = departementsVisibles().slice(0, 4);
+    info.textContent = "Chargement des lieux…";
+    Promise.all(deps.map(function (d) { return chargerPoi(d).catch(function () { return null; }); })).then(function () {
+      info.textContent = "Cliquez sur un lieu pour le détail.";
+    });
+  }
+
+  function activerPoi(actif) {
+    if (!actif) { if (etat.calquePoi) carte.removeLayer(etat.calquePoi); $("poi-info").textContent = "Visibles en zoomant sur une ville."; return; }
+    carte.addLayer(calquePoi());
+    majPoi();
+  }
+
+  /* Priorité des « incontournables » : musées de France, monuments classés, puis le reste par catégorie */
+  function priorite(k) {
+    if (k.statut === "musée de France") return 0;
+    if (k.statut === "classé MH") return 1;
+    return 2 + k.categorie + (k.statut === "inscrit MH" ? 0 : 0.5);
+  }
+
+  function dessinerLieuxVille(dep, code) {
+    var cible = $("lieux-ville");
+    fichierDep("poi/" + dep + ".json").then(function (f) {
+      if (etat.ville !== code || !$("lieux-ville")) return;
+      var lieux = f.points.map(function (p) { var k = {}; f.champs.forEach(function (c, i) { k[c] = p[i]; }); k.brut = p; return k; })
+        .filter(function (k) { return k.commune === code; });
+      if (!lieux.length) { cible.innerHTML = '<p class="note-ville">Aucun lieu recensé dans cette commune.</p>'; return; }
+      var compte = f.categories.map(function () { return 0; });
+      lieux.forEach(function (k) { compte[k.categorie]++; });
+      lieux.sort(function (a, b) { return priorite(a) - priorite(b) || a.nom.localeCompare(b.nom, "fr"); });
+      var html = '<p class="note-ville">' + compte.map(function (n, i) {
+        return n ? f.categories[i] + " : " + n : null; }).filter(Boolean).join(" ; ") + ".</p><ul class=\"liste-lieux\">";
+      lieux.slice(0, 8).forEach(function (k, i) {
+        html += '<li><button type="button" data-i="' + i + '"><i style="background:' + POI_COULEURS[k.categorie] + '" aria-hidden="true"></i>' +
+          '<span class="nom-lieu">' + echapper(k.nom) + '</span><span class="cat-lieu">' + echapper(f.categories[k.categorie]) +
+          (k.statut ? ", " + echapper(k.statut) : "") + "</span></button></li>";
+      });
+      cible.innerHTML = html + "</ul>" + (lieux.length > 8 ? '<p class="note-ville">Activez le calque « Lieux à visiter » pour voir les ' + lieux.length + " lieux.</p>" : "");
+      cible.querySelectorAll("button[data-i]").forEach(function (b) {
+        b.addEventListener("click", function () {
+          var k = lieux[Number(b.getAttribute("data-i"))];
+          if (!$("calque-poi").checked) { $("calque-poi").checked = true; activerPoi(true); }
+          chargerPoi(dep).then(function () {
+            var cle = k.brut[0] + "," + k.brut[1] + "," + k.brut[2], cible = null;
+            calquePoi().eachLayer(function (m) { if (m._cle === cle) cible = m; });
+            if (cible) calquePoi().zoomToShowLayer(cible, function () { cible.openPopup(); });
+          });
+        });
+      });
+    }).catch(function () { cible.innerHTML = '<p class="indispo">Lieux indisponibles.</p>'; });
+  }
+
+  function legendePoi() {
+    var noms = ["Musée", "Monument historique", "Patrimoine", "Parc ou jardin", "Nature", "Itinéraire vélo", "Location, réparation"];
+    $("legende-poi").innerHTML = noms.map(function (n, i) {
+      return '<span><i style="background:' + POI_COULEURS[i] + '" aria-hidden="true"></i>' + n + "</span>";
+    }).join("");
+  }
+
   // ---------------------------------------------------------------- démarrage
 
   function remplirSelecteurs() {
@@ -878,7 +1003,9 @@
     $("onglet-bas").addEventListener("click", function () { choisirOnglet("bas"); });
     $("calque-vls").addEventListener("change", function (e) { activerVLS(e.target.checked); });
     $("calque-stationnement").addEventListener("change", function (e) { activerStationnement(e.target.checked); });
-    carte.on("moveend", majStationnement);
+    $("calque-poi").addEventListener("change", function (e) { activerPoi(e.target.checked); });
+    carte.on("moveend", function () { majStationnement(); majPoi(); });
+    legendePoi();
     $("calque-cyclosm").addEventListener("change", function (e) {
       if (e.target.checked) etat.calqueCyclOSM.addTo(carte); else carte.removeLayer(etat.calqueCyclOSM);
     });

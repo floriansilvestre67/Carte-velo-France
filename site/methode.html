@@ -105,6 +105,18 @@
     <p id="coherence-stat">Chargement…</p>
     <p>Les deux reposent sur OpenStreetMap, mais l'indicateur officiel est figé au 1er janvier, alors que les emplacements sont ceux du jour : les emplacements ajoutés depuis creusent l'écart. Une partie des emplacements n'a pas de capacité renseignée ; ils comptent pour 0 place dans le total de la carte.</p>
 
+    <h2 id="lieux">Lieux à visiter</h2>
+    <h3>Sources</h3>
+    <ul>
+      <li><a href="https://www.data.gouv.fr/datasets/5b598be088ee387c0c353714">DATAtourisme</a>, base nationale des données touristiques (ADN Tourisme), Licence Ouverte 2.0 : exports quotidiens des lieux, itinéraires et prestations.</li>
+      <li><a href="https://www.data.gouv.fr/datasets/immeubles-proteges-au-titre-des-monuments-historiques-2">Immeubles protégés au titre des monuments historiques</a> (Ministère de la Culture, base Mérimée), Licence Ouverte.</li>
+      <li><a href="https://www.data.gouv.fr/datasets/musees-de-france-base-museofile">Répertoire des Musées de France, base Muséofile</a> (Ministère de la Culture), Licence Ouverte. Il remplace l'ancienne liste des musées de France, archivée en 2026.</li>
+    </ul>
+    <h3>Sélection</h3>
+    <p>Sont retenus les lieux qui valent une visite à vélo : musées, monuments et sites patrimoniaux, parcs et jardins, sites naturels et points de vue, itinéraires vélo, et loueurs ou réparateurs de vélos. Les hébergements, restaurants, événements, commerces, fermes, bibliothèques et salles de spectacle sont écartés. <span id="comptes-poi"></span></p>
+    <h3>Rattachement et doublons</h3>
+    <p>DATAtourisme et Muséofile ne donnent pas de code commune : chaque lieu est rattaché à la commune qui contient sa position. Un monument ou un musée officiel qui correspond à un lieu DATAtourisme de même nature (à moins de 30 m, ou à moins de 150 m avec un nom proche) n'apparaît qu'une fois, avec son statut officiel. Dans la fiche d'une ville, les lieux mis en avant sont d'abord les musées de France et les monuments classés. Les lieux sont recalculés une fois par semaine.</p>
+
     <h2 id="accidents">Accidents de vélo</h2>
     <h3>Source</h3>
     <p>Jeu <a href="https://opendata.koumoul.com/datasets/accidents-velos">« Accidents de vélo »</a> publié sur Koumoul, construit à partir des <a href="https://www.data.gouv.fr/datasets/bases-de-donnees-annuelles-des-accidents-corporels-de-la-circulation-routiere-annees-de-2005-a-2024/">fichiers annuels des accidents corporels (BAAC)</a> de l'Observatoire national interministériel de la sécurité routière (ONISR), Licence Ouverte. Les codes sont décodés selon la <a href="https://static.data.gouv.fr/resources/bases-de-donnees-annuelles-des-accidents-corporels-de-la-circulation-routiere-annees-de-2005-a-2024/20251021-115933/description-des-bases-de-donnees-annuelles.pdf">description officielle des bases de données annuelles</a>. Seule la France métropolitaine est retenue.</p>

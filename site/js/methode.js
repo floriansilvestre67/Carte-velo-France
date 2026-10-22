@@ -10,7 +10,8 @@
     accidents: "Accidents de vélo",
     contours_communes: "Contours des communes",
     stationnement: "Stationnement (indicateurs officiels)",
-    stationnement_osm: "Stationnement (emplacements OSM)"
+    stationnement_osm: "Stationnement (emplacements OSM)",
+    poi: "Lieux à visiter"
   };
   // Même regroupement que scripts/sources/amenagements.py
   function categorie(t) {
@@ -71,6 +72,13 @@
         tr.appendChild(km);
         corpsTypes.appendChild(tr);
       });
+    }
+
+    var comptes = ((meta.sources || {}).poi || {}).comptes, ciblePoi = document.getElementById("comptes-poi");
+    if (comptes && ciblePoi) {
+      var fc = new Intl.NumberFormat("fr-FR");
+      ciblePoi.textContent = "Lors du dernier recalcul : " + Object.keys(comptes).map(function (k) {
+        return k + " : " + fc.format(comptes[k]); }).join(" ; ") + ".";
     }
 
     // Cohérence entre les emplacements OSM et l'indicateur officiel

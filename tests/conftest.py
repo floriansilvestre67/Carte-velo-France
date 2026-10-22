@@ -8,6 +8,7 @@ Le « monde fictif » :
     plus un jeu d'autopartage à ignorer.
 """
 
+import csv
 import gzip
 import json
 import sys
@@ -19,8 +20,8 @@ import pytest
 RACINE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RACINE / "scripts"))
 
-from sources import (accidents, amenagements, communes, contours_communes, departements, regions,  # noqa: E402
-                     stationnement, vls)
+from sources import (accidents, amenagements, communes, contours_communes, departements, poi,  # noqa: E402
+                     regions, stationnement, vls)
 
 CODES = [f"{i:02d}" for i in range(1, 96) if i != 20] + ["2A", "2B"]
 TAILLE = 0.5  # degrés
@@ -138,6 +139,61 @@ def stationnement_fictif(d: Path, urls: dict) -> None:
         {"title": "Format GeoJSON", "format": "geojson.zip", "url": url_zip}]})
 
 
+def poi_fictifs(d: Path, urls: dict) -> None:
+    """Exports DATAtourisme (place, tour, product), Mérimée et Muséofile au format réel."""
+    D = "https://www.datatourisme.fr/ontology/core#"
+    lon, lat = centre("63")
+    entete = ["Nom_du_POI", "Categories_de_POI", "Latitude", "Longitude", "Adresse_postale",
+              "Code_postal_et_commune", "Description", "URI_ID_du_POI"]
+    def l(nom, cats, la, lo, uri, desc=""):
+        return [nom, "|".join(D + c for c in ["PointOfInterest", "PlaceOfInterest"] + cats), la, lo, "", "", desc, uri]
+    place = [entete,
+             l("Musée d'art Roger-Quilliot", ["CulturalSite", "Museum"], lat, lon, "u1", "Un musée, avec, des virgules"),
+             l("Hôtel du Centre", ["Accommodation", "Hotel"], lat, lon, "u2"),
+             l("Église Notre-Dame", ["CulturalSite", "ReligiousSite", "Church"], lat + 0.01, lon, "u3"),
+             l("Jardin Lecoq", ["ParkAndGarden"], lat + 0.02, lon, "u4"),
+             l("Plage du lac", ["NaturalHeritage", "Beach"], lat + 0.03, lon, "u5"),
+             l("Médiathèque", ["CulturalSite", "Library"], lat, lon + 0.01, "u6"),
+             l("Site de La Réunion", ["CulturalSite"], -21.1, 55.5, "u7"),
+             l("Musée d'art Roger-Quilliot", ["CulturalSite", "Museum"], lat, lon, "u1")]          # doublon d'URI
+    tour = [entete, l("Boucle des volcans à vélo", ["Tour", "CyclingTour"], lat - 0.01, lon, "t1"),
+            l("Sentier pédestre", ["Tour", "WalkingTour"], lat - 0.02, lon, "t2")]
+    product = [entete, l("Location de vélos du lac", ["Product", "Rental", "EquipmentRental"], lat - 0.03, lon, "p1"),
+               l("Location de kayaks", ["Product", "Rental", "EquipmentRental"], lat - 0.03, lon + 0.01, "p2")]
+    ressources = []
+    for nom, lignes in (("place", place), ("tour", tour), ("product", product), ("fma", [entete])):
+        chemin = d / f"datatourisme-{nom}.csv"
+        with open(chemin, "w", encoding="utf-8", newline="") as f:
+            csv.writer(f).writerows(lignes)
+        url = f"https://static.data.gouv.fr/datatourisme-{nom}.csv"
+        urls[url] = chemin
+        ressources.append({"title": f"datatourisme-{nom}.csv", "url": url, "format": "csv"})
+    urls[poi.URL_API.format(poi.ID_DATATOURISME)] = ecrire(d, "jeu-dt.json", {"resources": ressources})
+
+    merimee = [["Reference", "Titre_editorial_de_la_notice", "Denomination_de_l_edifice", "Typologie_de_la_protection",
+                "Format_abrege_du_siecle_de_construction", "coordonnees_au_format_WGS84"],
+               ["PA001", "Église Notre-Dame", "église", "classé MH", "12e s.", f"{lat + 0.0101}, {lon}"],   # 11 m de u3
+               ["PA002", "Halle aux blés", "halle", "inscrit MH", "19e s.", f"{lat + 0.04}, {lon}"],
+               ["PA003", "Sans coordonnées", "croix", "inscrit MH", "", ""]]
+    chemin = d / "merimee.csv"
+    with open(chemin, "w", encoding="utf-8", newline="") as f:
+        csv.writer(f, delimiter=";").writerows(merimee)
+    urls["https://culture.example/merimee.csv"] = chemin
+    urls[poi.URL_API.format(poi.ID_MERIMEE)] = ecrire(d, "jeu-mh.json", {"resources": [
+        {"title": "geojson", "format": "geojson", "url": "https://culture.example/merimee.geojson"},
+        {"title": "csv", "format": "csv", "url": "https://culture.example/merimee.csv"}]})
+    lon69, lat69 = centre("69")
+    museofile = [["Identifiant", "Nom_officiel", "Ville", "URL", "Coordonnees", "Atout"],
+                 ["M1", "Musée d'art Roger Quilliot", "Clermont", "www.musee.example", f"{lat + 0.0005}, {lon + 0.0005}", ""],
+                 ["M2", "Musée des Confluences", "Lyon", "", f"{lat69}, {lon69}", "Sciences et sociétés"]]
+    chemin = d / "museofile.csv"
+    with open(chemin, "w", encoding="utf-8", newline="") as f:
+        csv.writer(f).writerows(museofile)
+    urls["https://culture.example/museofile.csv"] = chemin
+    urls[poi.URL_API.format(poi.ID_MUSEOFILE)] = ecrire(d, "jeu-musees.json", {"resources": [
+        {"title": "museofile.csv", "format": "csv", "url": "https://culture.example/museofile.csv"}]})
+
+
 def liste_communes():
     liste = []
     for n, code in enumerate(CODES):
@@ -239,6 +295,7 @@ def monde(tmp_path):
         {"nom": "Paris 1er Arrondissement", "code": "75101", "codesPostaux": ["75001"], "population": 15000, "codeDepartement": "75"},
         {"nom": "Lyon 3e Arrondissement", "code": "69383", "codesPostaux": ["69003"], "population": 100000, "codeDepartement": "69"}])
     stationnement_fictif(d, urls)
+    poi_fictifs(d, urls)
     urls[communes.URL_DELEGUEES] = ecrire(d, "deleguees.json", [
         {"code": "63999", "nom": "Ancienne commune", "chefLieu": "63001"},
         {"code": "63001", "nom": "Chef-lieu lui-même", "chefLieu": "63001"}])

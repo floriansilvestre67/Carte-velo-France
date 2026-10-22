@@ -28,7 +28,7 @@ from pathlib import Path
 
 import indicateurs
 from reseau import ClientHTTP
-from sources import (accidents, amenagements, communes, contours_communes, departements, regions,
+from sources import (accidents, amenagements, communes, contours_communes, departements, poi, regions,
                      stationnement, vls)
 
 TAILLE_MAX = 50 * 1024 * 1024  # 50 Mo par fichier publié
@@ -38,6 +38,7 @@ CLES_VLS = ["vls_stations", "vls_velos"]
 CLES_COMMUNES = ["population", "surface_km2"]
 CLES_REGIONS = ["region", "region_nom"]
 CLES_STATIONNEMENT = ["stat_places", "stat_places_secu", "stat_secu_1000"]
+POI_JOURS = 7  # les points d'intérêt (≈ 450 Mo de sources) ne sont recalculés qu'une fois par semaine
 SEUIL_GRANDES_COMMUNES = 10_000  # habitants : communes retenues pour les corrélations nationales
 
 
@@ -286,6 +287,43 @@ def construire(client, sortie: Path, travail: Path, url_precedent: str | None = 
         traceback.print_exc()
         sources_meta["stationnement_osm"] = {"statut": "indisponible", "detail": f"Source injoignable : {e}"}
 
+    # 4 ter. Points d'intérêt
+    journal("   Points d'intérêt (DATAtourisme, Mérimée, Muséofile)…")
+    poi_par_dep = None
+    ancien_poi = ((precedent or {}).get("meta", {}).get("sources") or {}).get("poi") or {}
+    age = None
+    if ancien_poi.get("date_donnees") and ancien_poi.get("statut") == "ok":
+        age = (datetime.fromisoformat(maintenant[:10]) - datetime.fromisoformat(ancien_poi["date_donnees"])).days
+    if age is not None and age < POI_JOURS and not os.environ.get("FORCER_POI"):
+        anciens = {dep: fichier_precedent(client, url_precedent, f"poi/{dep}.json") for dep in codes}
+        if all(anciens.values()):
+            poi_par_dep = {dep: f["points"] for dep, f in anciens.items()}
+            sources_meta["poi"] = ancien_poi
+            journal(f"  recalcul hebdomadaire : fichiers du {ancien_poi['date_donnees']} repris")
+    if poi_par_dep is None:
+        try:
+            res_p = poi.calculer(client, travail, codes, localisateur, localisateur_communes)
+            poi_par_dep = res_p["par_dep"]
+            st = res_p["stats"]
+            sources_meta["poi"] = {
+                "statut": "ok", "url": "https://www.data.gouv.fr/datasets/" + poi.ID_DATATOURISME,
+                "date_donnees": maintenant[:10],
+                "detail": f"{sum(res_p['comptes'].values()):,} lieux retenus ; {st.get('doublons', 0):,} doublons fusionnés".replace(",", " ")
+                          + (" ; sources en échec : " + ", ".join(res_p["erreurs"]) if res_p["erreurs"] else ""),
+                "comptes": res_p["comptes"], "classes_gardees": st.get("classes_gardees"),
+                "classes_ecartees": st.get("classes_ecartees")}
+            journal(f"  {sources_meta['poi']['detail']} {res_p['comptes']}")
+        except Exception as e:
+            journal(f"  ✗ {e}")
+            traceback.print_exc()
+            anciens = {dep: fichier_precedent(client, url_precedent, f"poi/{dep}.json") for dep in codes}
+            if all(anciens.values()):
+                poi_par_dep = {dep: f["points"] for dep, f in anciens.items()}
+                sources_meta["poi"] = {**ancien_poi, "statut": "reprise",
+                                       "detail": f"Sources injoignables ({e}) : lieux repris de la mise à jour précédente."}
+            else:
+                sources_meta["poi"] = {"statut": "indisponible", "detail": f"Sources injoignables : {e}"}
+
     # 5. Accidents de vélo
     journal("5/6 Accidents de vélo (Koumoul / ONISR)…")
     accs = None
@@ -314,6 +352,13 @@ def construire(client, sortie: Path, travail: Path, url_precedent: str | None = 
     ecrire_accidents_et_communes(client, sortie, url_precedent, sources_meta, deps, par_code, region_de,
                                  liste_communes, correspondance, km_communes, accs, vls_communes, stat_communes)
     ecrire_stationnement(client, sortie, url_precedent, codes, emplacements_osm, sources_meta)
+    if poi_par_dep is not None:
+        total = 0
+        for dep in codes:
+            total += ecrire_json(sortie / "poi" / f"{dep}.json", {
+                "categories": poi.CATEGORIES, "sources": poi.SOURCES, "champs": poi.CHAMPS,
+                "points": poi_par_dep.get(dep, [])})
+        journal(f"  → poi/*.json ({total / 1024:.0f} Ko au total)")
     ecrire_communes_carte(client, sortie, url_precedent, codes, liste_communes, arrondissements, contours_par_dep)
 
     geojson = {"type": "FeatureCollection", "features": [

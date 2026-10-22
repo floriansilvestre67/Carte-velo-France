@@ -9,6 +9,11 @@ on:
   schedule:
     - cron: "17 4 * * *"   # en UTC
   workflow_dispatch:
+    inputs:
+      forcer_poi:
+        description: "Recalculer les points d'intérêt sans attendre la semaine suivante"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -45,6 +50,7 @@ jobs:
         env:
           # Site déjà en ligne : sert de secours si une source est en panne aujourd'hui.
           SITE_PRECEDENT_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+          FORCER_POI: ${{ inputs.forcer_poi && '1' || '' }}
         run: python scripts/construire_donnees.py --sortie site/data
 
       - name: Préparer GitHub Pages
