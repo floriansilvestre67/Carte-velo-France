@@ -60,12 +60,9 @@ def lire_csv(chemin: Path):
     with open(chemin, "rb") as f:
         brut = f.read()
     texte = brut.decode("utf-8-sig", errors="replace")
-    echantillon = texte[:5000]
-    try:
-        dialecte = csv.Sniffer().sniff(echantillon, delimiters=",;\t")
-    except csv.Error:
-        dialecte = csv.excel
-    return list(csv.DictReader(io.StringIO(texte), dialect=dialecte))
+    entete = texte.split("\n", 1)[0]
+    sep = max([";", ",", "\t"], key=entete.count)   # séparateur le plus fréquent dans l'en-tête
+    return list(csv.DictReader(io.StringIO(texte), delimiter=sep))
 
 
 def _date(ligne) -> str:

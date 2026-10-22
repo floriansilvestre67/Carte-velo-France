@@ -312,6 +312,8 @@ def construire(client, sortie: Path, travail: Path, url_precedent: str | None = 
                            f"et musées officiels lus ; {st.get('doublons', 0):,} doublons fusionnés").replace(",", " ")
                           + (" ; sources en échec : " + ", ".join(res_p["erreurs"]) if res_p["erreurs"] else ""),
                 "comptes": res_p["comptes"], "classes_gardees": st.get("classes_gardees"),
+                "diagnostic": {"merimee_lignes": st.get("merimee_lignes"), "museofile_lignes": st.get("museofile_lignes"),
+                               "fichiers": st.get("fichiers")},
                 "classes_ecartees": st.get("classes_ecartees")}
             journal(f"  {sources_meta['poi']['detail']} {res_p['comptes']}")
         except Exception as e:

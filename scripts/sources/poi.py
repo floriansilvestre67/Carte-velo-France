@@ -30,7 +30,7 @@ from pathlib import Path
 
 from sources.communes import departement_du_code
 
-VERSION = 2  # à augmenter quand la sélection change : force le recalcul sans attendre la semaine
+VERSION = 3  # à augmenter quand la sélection change : force le recalcul sans attendre la semaine
 ID_DATATOURISME = "5b598be088ee387c0c353714"
 ID_MERIMEE = "5af120e5b595087cfabcde81"
 ID_MUSEOFILE = "5d12ee8206e3e762c0c89a4c"
@@ -114,18 +114,24 @@ def coordonnees(texte):
     return lat, lon
 
 
+def separateur(entete: str) -> str:
+    """Séparateur le plus fréquent dans la ligne d'en-tête (les textes longs trompent la détection automatique)."""
+    return max([";", ",", "\t", "|"], key=entete.count)
+
+
+DIAGNOSTIC_CSV: dict[str, dict] = {}
+
+
 def lignes_csv(chemin: Path):
-    """Itère sur un gros CSV (séparateur deviné sur les premières lignes)."""
+    """Itère sur un gros CSV ; les en-têtes sont normalisés : « Coordonnées au format WGS84 » et
+    « coordonnees_au_format_WGS84 » deviennent tous deux « coordonnees au format wgs84 »."""
     with open(chemin, "r", encoding="utf-8-sig", errors="replace", newline="") as f:
-        debut = f.read(20000)
+        sep = separateur(f.readline())
         f.seek(0)
-        try:
-            dialecte = csv.Sniffer().sniff(debut, delimiters=",;\t")
-        except csv.Error:
-            dialecte = csv.excel
-        # En-têtes normalisés : « Coordonnées au format WGS84 » et « coordonnees_au_format_WGS84 »
-        # deviennent tous deux « coordonnees au format wgs84 ».
-        for ligne in csv.DictReader(f, dialect=dialecte):
+        lecteur = csv.DictReader(f, delimiter=sep)
+        DIAGNOSTIC_CSV[Path(chemin).name] = {"separateur": sep,
+                                              "colonnes": [_norm(c) for c in (lecteur.fieldnames or [])][:40]}
+        for ligne in lecteur:
             yield {_norm(k): v for k, v in ligne.items() if k is not None}
 
 
@@ -311,4 +317,5 @@ def calculer(client, travail: Path, codes_valides: set[str], localisateur_dep, l
     comptes = Counter(CATEGORIES[p["cat"]] for p in tous)
     if not tous:
         raise ValueError("Aucun point d'intérêt retenu")
+    stats["fichiers"] = {k: v for k, v in DIAGNOSTIC_CSV.items() if "datatourisme" not in k}
     return {"par_dep": par_dep, "stats": dict(stats), "comptes": dict(comptes), "erreurs": erreurs}
