@@ -594,6 +594,17 @@
         if (c.km[t[0]]) html += ligne(t[1], fmt1.format(c.km[t[0]]) + " km");
       });
     }
+    html += '<tr class="groupe"><th scope="rowgroup" colspan="2">Stationnement vélo</th></tr>';
+    if (c.stat) {
+      html += ligne("Places", c.stat.p != null ? fmt0.format(c.stat.p) : null);
+      html += ligne("Dont sécurisées (accroche cadre)", c.stat.s != null ? fmt0.format(c.stat.s) : null);
+      html += ligne("Sécurisées pour 1 000 habitants", c.stat.s1000 != null ? fmt1.format(c.stat.s1000) : null,
+                    rangDansDep(f, code, function (x) { return x.stat && x.p ? x.stat.s1000 : null; }));
+      var dStat = (etat.meta.sources.stationnement || {}).date_donnees;
+      if (dStat) html += '<tr><td colspan="2" class="note-ville">Relevé officiel au ' + echapper(dateFr(dStat)) + ".</td></tr>";
+    } else {
+      html += ligne("Places", null);
+    }
     html += '<tr class="groupe"><th scope="rowgroup" colspan="2">Vélos en libre-service</th></tr>';
     if (c.vls) {
       html += ligne("Stations", fmt0.format(c.vls.st));
@@ -710,6 +721,92 @@
     });
   }
 
+  // ---------------------------------------------------------------- calque stationnement (OSM)
+
+  var ZOOM_STAT = 11;
+  var statCharges = {};       // département -> true quand ses points sont dans le calque
+
+  function nomsValeur(f, champ, i) { return i >= 0 ? f.valeurs[champ][i] : null; }
+
+  function popupStationnement(f, p) {
+    var k = {}; f.champs.forEach(function (c, i) { k[c] = p[i]; });
+    var accroche = nomsValeur(f, "accroche", k.accroche), protection = nomsValeur(f, "protection", k.protection);
+    var oui = function (v) { return v === 1 ? "oui" : v === 0 ? "non" : "non renseigné"; };
+    var secu = accroche === "cadre" || accroche === "cadre et roue";
+    var lignes = [
+      "Capacité : " + (k.capacite != null ? k.capacite + " place" + (k.capacite > 1 ? "s" : "") : "non renseignée") +
+        (k.capacite_cargo ? " (dont " + k.capacite_cargo + " vélo-cargo)" : ""),
+      "Accroche : " + (accroche || "non renseignée"),
+      nomsValeur(f, "mobilier", k.mobilier) ? "Mobilier : " + nomsValeur(f, "mobilier", k.mobilier) : null,
+      protection && protection.indexOf("ferm") >= 0 ? "Fermé : " + protection : null,
+      "Couvert : " + oui(k.couverture) + ", surveillé : " + oui(k.surveillance) + ", gratuit : " + oui(k.gratuit),
+      nomsValeur(f, "acces", k.acces) ? "Accès : " + nomsValeur(f, "acces", k.acces) : null
+    ];
+    return "<strong>" + (secu ? "Stationnement sécurisé" : "Stationnement vélo") + "</strong><br>" +
+      lignes.filter(Boolean).map(echapper).join("<br>") +
+      "<br><small>© les contributeurs d'OpenStreetMap sous licence ODbL</small>";
+  }
+
+  function calqueStationnement() {
+    if (!etat.calqueStat) {
+      etat.calqueStat = L.markerClusterGroup({
+        chunkedLoading: true, showCoverageOnHover: false, maxClusterRadius: 45, disableClusteringAtZoom: 17,
+        attribution: "Stationnement : © les contributeurs d'OpenStreetMap sous licence ODbL",
+        iconCreateFunction: function (c) {
+          var n = c.getChildCount(), taille = n < 100 ? 30 : n < 1000 ? 38 : 46;
+          return L.divIcon({ html: "<span>" + n + "</span>", className: "cluster-stat", iconSize: [taille, taille] });
+        }
+      });
+    }
+    return etat.calqueStat;
+  }
+
+  /* Départements visibles à l'écran (et celui de la ville choisie) */
+  function departementsVisibles() {
+    var b = carte.getBounds(), deps = [];
+    Object.keys(etat.couches).forEach(function (code) {
+      if (b.intersects(etat.couches[code].getBounds())) deps.push(code);
+    });
+    if (etat.ville) deps.push(RechercheVille.departement(etat.ville));
+    return deps.filter(function (d, i) { return deps.indexOf(d) === i; });
+  }
+
+  function majStationnement() {
+    if (!$("calque-stationnement").checked) return;
+    var info = $("stat-info");
+    if (carte.getZoom() < ZOOM_STAT) {
+      info.textContent = "Zoomez sur une ville pour afficher les emplacements.";
+      return;
+    }
+    var aCharger = departementsVisibles().filter(function (d) { return !statCharges[d]; }).slice(0, 4);
+    if (!aCharger.length) { info.textContent = "Emplacements affichés. Cliquez sur un point pour le détail."; return; }
+    info.textContent = "Chargement des emplacements…";
+    Promise.all(aCharger.map(function (dep) {
+      statCharges[dep] = true;
+      return fichierDep("stationnement/" + dep + ".json").then(function (f) {
+        var ia = f.champs.indexOf("accroche");
+        var marqueurs = f.points.map(function (p) {
+          var acc = nomsValeur(f, "accroche", p[ia]);
+          var secu = acc === "cadre" || acc === "cadre et roue";
+          var m = L.circleMarker([p[0], p[1]], secu
+            ? { radius: 6, color: "#ffffff", weight: 1.5, fillColor: "#1f2a2e", fillOpacity: 1 }
+            : { radius: 5, color: "#1f2a2e", weight: 1.5, fillColor: "#ffffff", fillOpacity: 1 });
+          m.bindPopup(function () { return popupStationnement(f, p); });
+          return m;
+        });
+        calqueStationnement().addLayers(marqueurs);
+      }).catch(function () { delete statCharges[dep]; });
+    })).then(function () {
+      info.textContent = "Emplacements affichés. Cliquez sur un point pour le détail.";
+    });
+  }
+
+  function activerStationnement(actif) {
+    if (!actif) { if (etat.calqueStat) carte.removeLayer(etat.calqueStat); $("stat-info").textContent = "Visible en zoomant sur une ville."; return; }
+    carte.addLayer(calqueStationnement());
+    majStationnement();
+  }
+
   // ---------------------------------------------------------------- démarrage
 
   function remplirSelecteurs() {
@@ -780,6 +877,8 @@
     $("onglet-haut").addEventListener("click", function () { choisirOnglet("haut"); });
     $("onglet-bas").addEventListener("click", function () { choisirOnglet("bas"); });
     $("calque-vls").addEventListener("change", function (e) { activerVLS(e.target.checked); });
+    $("calque-stationnement").addEventListener("change", function (e) { activerStationnement(e.target.checked); });
+    carte.on("moveend", majStationnement);
     $("calque-cyclosm").addEventListener("change", function (e) {
       if (e.target.checked) etat.calqueCyclOSM.addTo(carte); else carte.removeLayer(etat.calqueCyclOSM);
     });

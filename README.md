@@ -62,7 +62,11 @@ site/
 | Aménagements cyclables | [data.gouv.fr, jeu 60a37b7f303fdf4f2654b73d](https://www.data.gouv.fr/fr/datasets/amenagements-cyclables-france-metropolitaine/) (Geovelo, OSM) | ODbL |
 | Vélos en libre-service | Flux GBFS de [transport.data.gouv.fr](https://transport.data.gouv.fr) | propre à chaque flux |
 | Population, surface, régions | [geo.api.gouv.fr](https://geo.api.gouv.fr) | Licence Ouverte |
-| Contours | [gregoiredavid/france-geojson](https://github.com/gregoiredavid/france-geojson) | voir le dépôt |
+| Contours des départements | [gregoiredavid/france-geojson](https://github.com/gregoiredavid/france-geojson) | voir le dépôt |
+| Contours des communes | [Etalab, contours administratifs](https://etalab-datasets.geo.data.gouv.fr/contours-administratifs/latest/geojson/) | Licence Ouverte |
+| Accidents de vélo | [Koumoul « Accidents de vélo »](https://opendata.koumoul.com/datasets/accidents-velos), d'après les BAAC de l'ONISR | Licence Ouverte |
+| Stationnement (indicateurs) | [Ecolab, places de stationnement vélo](https://www.data.gouv.fr/datasets/nombre-de-places-de-stationnement-velo) et [places sécurisées](https://www.data.gouv.fr/datasets/nombre-de-places-de-stationnement-velo-securisees-type-accroche-cadre-et-roue-ou-cadre-pour-1000-hab) | ODbL |
+| Stationnement (emplacements) | [Stationnements cyclables issus d'OpenStreetMap](https://www.data.gouv.fr/datasets/stationnements-cyclables-issus-dopenstreetmap) | ODbL |
 | Fonds de carte | OpenStreetMap, CyclOSM, © contributeurs OpenStreetMap | ODbL |
 
 La méthode de calcul (comptage des côtés, rangs centiles, score) est détaillée sur la page « Sources et méthode » du site.

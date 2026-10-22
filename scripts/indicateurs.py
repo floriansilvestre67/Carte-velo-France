@@ -23,6 +23,9 @@ INDICATEURS = [
     {"cle": "vls_stations", "libelle": "Stations de vélos en libre-service", "unite": "stations", "decimales": 0, "groupe": "Vélos en libre-service"},
     {"cle": "vls_velos", "libelle": "Vélos en libre-service disponibles", "unite": "vélos", "decimales": 0, "groupe": "Vélos en libre-service"},
     {"cle": "vls_stations_100k", "libelle": "Stations pour 100 000 habitants", "unite": "stations / 100 000 hab.", "decimales": 1, "groupe": "Vélos en libre-service"},
+    {"cle": "stat_places", "libelle": "Places de stationnement vélo", "unite": "places", "decimales": 0, "groupe": "Stationnement"},
+    {"cle": "stat_places_secu", "libelle": "Places sécurisées (accroche cadre)", "unite": "places", "decimales": 0, "groupe": "Stationnement"},
+    {"cle": "stat_secu_1000", "libelle": "Places sécurisées pour 1 000 habitants", "unite": "places / 1 000 hab.", "decimales": 1, "groupe": "Stationnement"},
 ]
 
 SCORE_INDICATEURS = ["km_total", "km_10k_hab", "km_par_km2",

@@ -28,7 +28,8 @@ from pathlib import Path
 
 import indicateurs
 from reseau import ClientHTTP
-from sources import accidents, amenagements, communes, contours_communes, departements, regions, vls
+from sources import (accidents, amenagements, communes, contours_communes, departements, regions,
+                     stationnement, vls)
 
 TAILLE_MAX = 50 * 1024 * 1024  # 50 Mo par fichier publié
 
@@ -36,6 +37,7 @@ CLES_AMENAGEMENTS = ["km_total"] + [f"km_{c}" for c in amenagements.CATEGORIES]
 CLES_VLS = ["vls_stations", "vls_velos"]
 CLES_COMMUNES = ["population", "surface_km2"]
 CLES_REGIONS = ["region", "region_nom"]
+CLES_STATIONNEMENT = ["stat_places", "stat_places_secu", "stat_secu_1000"]
 SEUIL_GRANDES_COMMUNES = 10_000  # habitants : communes retenues pour les corrélations nationales
 
 
@@ -244,6 +246,46 @@ def construire(client, sortie: Path, travail: Path, url_precedent: str | None = 
         if appliquer_secours("vls", CLES_VLS, e) and precedent and precedent.get("stations"):
             stations_carte = precedent["stations"]
 
+    # 4 bis. Stationnement vélo
+    journal("   Stationnement vélo (indicateurs Ecolab et emplacements OSM)…")
+    stat_communes, emplacements_osm = None, None
+    try:
+        ind = stationnement.indicateurs(client, travail)
+        dep_ind = ind["departement"]
+        for code in codes:
+            pl = dep_ind["places"].get(code)
+            props[code]["stat_places"] = round(pl["places"]) if pl else None
+            props[code]["stat_places_secu"] = round(pl["places_secu"]) if pl else None
+            v = dep_ind["secu_1000"].get(code)
+            props[code]["stat_secu_1000"] = round(v, 3) if v is not None else None
+        com = ind["commune"]
+        stat_communes = {c: {"p": round(v["places"]), "s": round(v["places_secu"])} for c, v in com["places"].items()}
+        for c, v in com["secu_1000"].items():
+            stat_communes.setdefault(c, {})["s1000"] = round(v, 2)
+        sources_meta["stationnement"] = {
+            "statut": "ok", "url": "https://www.data.gouv.fr/datasets/nombre-de-places-de-stationnement-velo",
+            "date_donnees": dep_ind["date_places"],
+            "detail": f"Relevé au {dep_ind['date_places']} ; {len(stat_communes)} communes renseignées"}
+        journal(f"  {sources_meta['stationnement']['detail']}")
+    except Exception as e:
+        journal(f"  ✗ indicateurs : {e}")
+        traceback.print_exc()
+        appliquer_secours("stationnement", CLES_STATIONNEMENT, e)
+    try:
+        emplacements_osm = stationnement.emplacements(client, travail, codes, localisateur)
+        st = emplacements_osm["stats"]
+        meta_osm = {"statut": "ok", "url": emplacements_osm["url"], "date_donnees": maintenant[:10],
+                    "detail": f"{st['points']:,} emplacements ; {st['sans_capacite']:,} sans capacité renseignée".replace(",", " ")}
+        if sources_meta.get("stationnement", {}).get("statut") == "ok":
+            officiel = {c: {"places": props[c]["stat_places"] or 0} for c in codes}
+            meta_osm["coherence"] = stationnement.coherence(st["places"], officiel)
+        sources_meta["stationnement_osm"] = meta_osm
+        journal(f"  {meta_osm['detail']} ; cohérence : {meta_osm.get('coherence', {}).get('ecart_pct')} %")
+    except Exception as e:
+        journal(f"  ✗ emplacements : {e}")
+        traceback.print_exc()
+        sources_meta["stationnement_osm"] = {"statut": "indisponible", "detail": f"Source injoignable : {e}"}
+
     # 5. Accidents de vélo
     journal("5/6 Accidents de vélo (Koumoul / ONISR)…")
     accs = None
@@ -270,7 +312,8 @@ def construire(client, sortie: Path, travail: Path, url_precedent: str | None = 
     region_de = {c: p.get("region") for c, p in par_code.items()}
 
     ecrire_accidents_et_communes(client, sortie, url_precedent, sources_meta, deps, par_code, region_de,
-                                 liste_communes, correspondance, km_communes, accs, vls_communes)
+                                 liste_communes, correspondance, km_communes, accs, vls_communes, stat_communes)
+    ecrire_stationnement(client, sortie, url_precedent, codes, emplacements_osm, sources_meta)
     ecrire_communes_carte(client, sortie, url_precedent, codes, liste_communes, arrondissements, contours_par_dep)
 
     geojson = {"type": "FeatureCollection", "features": [
@@ -283,6 +326,26 @@ def construire(client, sortie: Path, travail: Path, url_precedent: str | None = 
         taille = ecrire_json(sortie / nom, contenu)
         journal(f"  → {sortie / nom} ({taille / 1024:.0f} Ko)")
     return meta
+
+
+def ecrire_stationnement(client, sortie, url_precedent, codes, emplacements_osm, sources_meta) -> None:
+    """stationnement/{dep}.json : emplacements OSM du département (calque de la carte)."""
+    total = 0
+    if emplacements_osm:
+        for dep in codes:
+            contenu = {"champs": stationnement.CHAMPS_POINT, "valeurs": emplacements_osm["valeurs"],
+                       "points": emplacements_osm["par_dep"].get(dep, [])}
+            total += ecrire_json(sortie / "stationnement" / f"{dep}.json", contenu)
+    else:
+        anciens = {dep: fichier_precedent(client, url_precedent, f"stationnement/{dep}.json") for dep in codes}
+        if not any(anciens.values()):
+            return
+        for dep, contenu in anciens.items():
+            if contenu:
+                total += ecrire_json(sortie / "stationnement" / f"{dep}.json", contenu)
+        sources_meta["stationnement_osm"]["statut"] = "reprise"
+        sources_meta["stationnement_osm"]["detail"] += " Emplacements repris de la mise à jour précédente."
+    journal(f"  → stationnement/*.json ({total / 1024:.0f} Ko au total)")
 
 
 def ecrire_communes_carte(client, sortie, url_precedent, codes, liste_communes, arrondissements,
@@ -304,7 +367,8 @@ def ecrire_communes_carte(client, sortie, url_precedent, codes, liste_communes, 
 
 
 def ecrire_accidents_et_communes(client, sortie, url_precedent, sources_meta, deps, par_code, region_de,
-                                 liste_communes, correspondance, km_communes, accs, vls_communes=None) -> None:
+                                 liste_communes, correspondance, km_communes, accs, vls_communes=None,
+                                 stat_communes=None) -> None:
     """Écrit accidents/national.json et communes/{dep}.json.
 
     Chaque composante manquante aujourd'hui (liste des communes, km par commune,
@@ -372,6 +436,16 @@ def ecrire_accidents_et_communes(client, sortie, url_precedent, sources_meta, de
                 km = ((ancien.get("communes") or {}).get(code_com) or {}).get("km")
                 if km is not None:
                     fiche["km"] = km
+        # Stationnement (indicateurs officiels) : p places, s sécurisées, s1000 sécurisées / 1 000 hab.
+        if stat_communes is not None:
+            for code_com, fiche in communes_dep.items():
+                if code_com in stat_communes:
+                    fiche["stat"] = stat_communes[code_com]
+        else:
+            ancien_stat = (precedent_dep(dep).get("communes") or {})
+            for code_com, fiche in communes_dep.items():
+                if (ancien_stat.get(code_com) or {}).get("stat") is not None:
+                    fiche["stat"] = ancien_stat[code_com]["stat"]
         # Vélos en libre-service par commune (st : stations, zv : zones virtuelles, v : vélos)
         if vls_communes is not None:
             for code_com, fiche in communes_dep.items():

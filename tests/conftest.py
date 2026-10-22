@@ -11,6 +11,7 @@ Le « monde fictif » :
 import gzip
 import json
 import sys
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -18,7 +19,8 @@ import pytest
 RACINE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RACINE / "scripts"))
 
-from sources import accidents, amenagements, communes, contours_communes, departements, regions, vls  # noqa: E402
+from sources import (accidents, amenagements, communes, contours_communes, departements, regions,  # noqa: E402
+                     stationnement, vls)
 
 CODES = [f"{i:02d}" for i in range(1, 96) if i != 20] + ["2A", "2B"]
 TAILLE = 0.5  # degrés
@@ -76,6 +78,64 @@ def contours_communes_fictifs():
             feats.append({"type": "Feature", "properties": {"code": code_com, "nom": "x", "departement": code},
                           "geometry": {"type": "Polygon", "coordinates": [anneau]}})
     return {"type": "FeatureCollection", "features": feats}
+
+
+def csv_texte(lignes, sep=","):
+    return "\n".join(sep.join(str(x) for x in l) for l in lignes) + "\n"
+
+
+def stationnement_fictif(d: Path, urls: dict) -> None:
+    """Indicateurs Ecolab (2 relevés, on garde le plus récent) et emplacements OSM."""
+    S = "https://static.data.gouv.fr/resources/stationnement/"
+    places_dep = [["date_mesure", "geocode_departement", "libelle_departement", "type_accroche", "valeur"],
+                  ["2024-01-01T00:00:00", "63", "Puy-de-Dôme", "cadre et roue", 100],
+                  ["2025-01-01T00:00:00", "63", "Puy-de-Dôme", "cadre et roue", 500],
+                  ["2025-01-01T00:00:00", "63", "Puy-de-Dôme", "cadre", 20],
+                  ["2025-01-01T00:00:00", "63", "Puy-de-Dôme", "roue", 300],
+                  ["2025-01-01T00:00:00", "63", "Puy-de-Dôme", "sans accroche", 80],
+                  ["2025-01-01T00:00:00", "75", "Paris", "cadre et roue", 1000]]
+    places_com = [["date_mesure", "geocode_commune", "libelle_commune", "type_accroche", "valeur"],
+                  ["2025-01-01T00:00:00", "63001", "Commune 63-1", "cadre et roue", 40],
+                  ["2025-01-01T00:00:00", "63001", "Commune 63-1", "roue", 10],
+                  ["2025-01-01T00:00:00", "75101", "Paris 1er", "cadre", 7],      # arrondissement -> Paris
+                  ["2025-01-01T00:00:00", "75056", "Paris", "cadre et roue", 993]]
+    secu_dep = [["date_mesure", "geocode_departement", "libelle_departement", "numerateur", "denominateur", "valeur"],
+                ["2025-01-01", "63", "Puy-de-Dôme", 520, 100000, 5.2]]
+    secu_com = [["date_mesure", "geocode_commune", "libelle_commune", "numerateur", "denominateur", "valeur"],
+                ["2025-01-01", "63001", "Commune 63-1", 40, 62001, 0.645]]
+    for id_jeu, fichiers in ((stationnement.ID_PLACES, {"departement": places_dep, "commune": places_com}),
+                             (stationnement.ID_SECURISEES, {"departement": secu_dep, "commune": secu_com})):
+        ressources = [{"title": "Description des champs", "url": S + id_jeu + "/desc.csv"}]
+        for niveau, lignes in fichiers.items():
+            url = S + id_jeu + f"/{niveau}.csv"
+            chemin = d / f"stat-{id_jeu}-{niveau}.csv"
+            chemin.write_text(csv_texte(lignes, ";" if niveau == "commune" else ","), encoding="utf-8")
+            urls[url] = chemin
+            ressources.append({"title": f"Indicateur - {niveau}", "url": url})
+        urls[stationnement.URL_API.format(id_jeu)] = ecrire(d, f"jeu-{id_jeu}.json", {"resources": ressources})
+
+    lon63, lat63 = centre("63")
+    pts = [
+        {"type": "Feature", "geometry": {"type": "Point", "coordinates": [lon63, lat63]},
+         "properties": {"code_com": "63001", "capacite": 10, "capacite_cargo": 2, "type_accroche": "cadre et roue",
+                        "mobilier": "arceau", "acces": "aucun", "gratuit": "true", "protection": "accès libre",
+                        "couverture": "false", "surveillance": "false"}},
+        {"type": "Feature", "geometry": {"type": "Point", "coordinates": [lon63 + 0.01, lat63]},
+         "properties": {"code_com": "63001", "capacite": None, "type_accroche": "roue", "mobilier": "ratelier"}},
+        {"type": "Feature", "geometry": {"type": "Point", "coordinates": [lon63 + 0.02, lat63]},   # sans code commune
+         "properties": {"capacite": 6, "type_accroche": "sans accroche", "protection": "box individuel fermé",
+                        "couverture": "true", "surveillance": "true", "gratuit": "false"}},
+        {"type": "Feature", "geometry": {"type": "Point", "coordinates": [55.45, -20.9]},
+         "properties": {"code_com": "97411", "capacite": 4}},                                    # outre-mer
+    ]
+    chemin_zip = d / "osm.zip"
+    with zipfile.ZipFile(chemin_zip, "w") as z:
+        z.writestr("bicycle_parking.geojson", json.dumps({"type": "FeatureCollection", "features": pts}))
+    url_zip = "https://geodatamine.example/bicycle_parking_geojson.zip"
+    urls[url_zip] = chemin_zip
+    urls[stationnement.URL_API.format(stationnement.ID_OSM)] = ecrire(d, "jeu-osm.json", {"resources": [
+        {"title": "Format CSV brut", "format": "csv", "url": "https://geodatamine.example/bicycle_parking.csv"},
+        {"title": "Format GeoJSON", "format": "geojson.zip", "url": url_zip}]})
 
 
 def liste_communes():
@@ -178,6 +238,7 @@ def monde(tmp_path):
     urls[communes.URL_ARRONDISSEMENTS] = ecrire(d, "arrondissements.json", [
         {"nom": "Paris 1er Arrondissement", "code": "75101", "codesPostaux": ["75001"], "population": 15000, "codeDepartement": "75"},
         {"nom": "Lyon 3e Arrondissement", "code": "69383", "codesPostaux": ["69003"], "population": 100000, "codeDepartement": "69"}])
+    stationnement_fictif(d, urls)
     urls[communes.URL_DELEGUEES] = ecrire(d, "deleguees.json", [
         {"code": "63999", "nom": "Ancienne commune", "chefLieu": "63001"},
         {"code": "63001", "nom": "Chef-lieu lui-même", "chefLieu": "63001"}])

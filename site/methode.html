@@ -93,6 +93,18 @@
     <p>Exemple : un département premier sur trois indicateurs (100), et au milieu du classement sur les trois autres (50), obtient (3 × 100 + 3 × 50) ÷ 6 = 75.</p>
     <p>Le score mesure une position relative entre départements, pas une qualité absolue. Il mélange volontairement des totaux, qui favorisent les grands départements, et des chiffres rapportés à la population ou à la surface, qui favorisent les départements urbains. Si une source est indisponible, le score est calculé sur les indicateurs restants et la fiche du département le signale.</p>
 
+    <h2 id="stationnement">Stationnement vélo</h2>
+    <h3>Sources</h3>
+    <ul>
+      <li>Indicateurs officiels du Tableau de bord des mobilités durables (Ecolab) : <a href="https://www.data.gouv.fr/datasets/nombre-de-places-de-stationnement-velo">nombre de places de stationnement vélo</a> et <a href="https://www.data.gouv.fr/datasets/nombre-de-places-de-stationnement-velo-securisees-type-accroche-cadre-et-roue-ou-cadre-pour-1000-hab">places sécurisées pour 1 000 habitants</a>, licence ODbL. Le relevé le plus récent est utilisé (un relevé par an, au 1er janvier).</li>
+      <li>Emplacements affichés sur la carte : <a href="https://www.data.gouv.fr/datasets/stationnements-cyclables-issus-dopenstreetmap">stationnements cyclables issus d'OpenStreetMap</a> (schéma national du stationnement cyclable), mis à jour quotidiennement. © les contributeurs d'OpenStreetMap sous licence ODbL.</li>
+    </ul>
+    <h3>Ce qu'est une place « sécurisée »</h3>
+    <p>Comme dans l'indicateur officiel, une place est sécurisée si le vélo peut y être attaché par le cadre : accroche « cadre » ou « cadre et roue » (arceaux, notamment). Les pince-roues et les emplacements sans accroche ne le sont pas. Les box et consignes fermées sont signalées dans le détail de chaque emplacement, mais ne changent pas cette définition, pour rester comparable à l'indicateur officiel.</p>
+    <h3>Écart entre les emplacements et l'indicateur officiel</h3>
+    <p id="coherence-stat">Chargement…</p>
+    <p>Les deux reposent sur OpenStreetMap, mais l'indicateur officiel est figé au 1er janvier, alors que les emplacements sont ceux du jour : les emplacements ajoutés depuis creusent l'écart. Une partie des emplacements n'a pas de capacité renseignée ; ils comptent pour 0 place dans le total de la carte.</p>
+
     <h2 id="accidents">Accidents de vélo</h2>
     <h3>Source</h3>
     <p>Jeu <a href="https://opendata.koumoul.com/datasets/accidents-velos">« Accidents de vélo »</a> publié sur Koumoul, construit à partir des <a href="https://www.data.gouv.fr/datasets/bases-de-donnees-annuelles-des-accidents-corporels-de-la-circulation-routiere-annees-de-2005-a-2024/">fichiers annuels des accidents corporels (BAAC)</a> de l'Observatoire national interministériel de la sécurité routière (ONISR), Licence Ouverte. Les codes sont décodés selon la <a href="https://static.data.gouv.fr/resources/bases-de-donnees-annuelles-des-accidents-corporels-de-la-circulation-routiere-annees-de-2005-a-2024/20251021-115933/description-des-bases-de-donnees-annuelles.pdf">description officielle des bases de données annuelles</a>. Seule la France métropolitaine est retenue.</p>
@@ -106,6 +118,7 @@
     </ul>
     <h3>Ruptures de série</h3>
     <ul>
+      <li><strong>En 2018 et en 2023</strong>, la source est très incomplète dans certains territoires : Paris compte 374 cyclistes en 2018 et 41 en 2023, contre environ 1 000 les autres années ; les Bouches-du-Rhône passent d'environ 100 accidents par an à environ 30 dès 2018. Ces trous viennent de la source elle-même.</li>
       <li><strong>À partir de 2018</strong>, la source compte nettement moins de cyclistes que les bilans officiels (156 tués en 2023 contre 226 selon l'ONISR). Elle semble ne pas inclure les vélos à assistance électrique, codés à part depuis 2018. Les années récentes sont sous-estimées et ne se comparent pas aux précédentes. La source s'arrête en 2023.</li>
       <li><strong>Depuis 2019</strong>, l'indicateur « blessé hospitalisé » n'est plus labellisé comme statistique publique par l'ONISR.</li>
       <li><strong>Depuis 2019</strong>, les situations « autre voie spéciale » et « autre » existent ; avant, le code 0 servait aussi pour « non renseigné ». Les motifs de déplacement sont non renseignés pour environ 21 % des cyclistes avant 2019.</li>

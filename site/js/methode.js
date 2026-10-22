@@ -7,7 +7,10 @@
     regions: "Régions",
     amenagements: "Aménagements cyclables",
     vls: "Vélos en libre-service",
-    accidents: "Accidents de vélo"
+    accidents: "Accidents de vélo",
+    contours_communes: "Contours des communes",
+    stationnement: "Stationnement (indicateurs officiels)",
+    stationnement_osm: "Stationnement (emplacements OSM)"
   };
   // Même regroupement que scripts/sources/amenagements.py
   function categorie(t) {
@@ -68,6 +71,19 @@
         tr.appendChild(km);
         corpsTypes.appendChild(tr);
       });
+    }
+
+    // Cohérence entre les emplacements OSM et l'indicateur officiel
+    var coh = ((meta.sources || {}).stationnement_osm || {}).coherence, cible = document.getElementById("coherence-stat");
+    if (cible) {
+      if (!coh) {
+        cible.textContent = "Comparaison indisponible lors du dernier calcul.";
+      } else {
+        var f0 = new Intl.NumberFormat("fr-FR");
+        cible.textContent = "Lors du dernier calcul, les emplacements OpenStreetMap totalisent " + f0.format(coh.total_osm) +
+          " places en métropole, contre " + f0.format(coh.total_officiel) + " pour l'indicateur officiel, soit un écart de " +
+          (coh.ecart_pct > 0 ? "+" : "") + new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 }).format(coh.ecart_pct) + " %.";
+      }
     }
   }).catch(function () {
     document.getElementById("genere").textContent = "L'état des données n'a pas pu être chargé.";

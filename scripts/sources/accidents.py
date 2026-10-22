@@ -59,6 +59,12 @@ CODE_SITU = {"1": 0, "5": 1, "4": 2, "3": 3, "2": 4, "6": 5, "8": 6}
 
 # Ruptures de série affichées sur le site
 RUPTURES = [
+    {"annees": [2018, 2018], "texte": "En 2018 et en 2023, la base est très incomplète dans certains territoires : "
+     "Paris compte 374 cyclistes en 2018 et 41 en 2023, contre environ 1 000 les autres années ; les Bouches-du-Rhône "
+     "passent d'environ 100 accidents par an à environ 30 dès 2018. Les classements et corrélations qui incluent "
+     "ces années sont faussés."},
+    {"annees": [2023, 2023], "texte": "L'année 2023 est très incomplète dans cette base (par exemple 41 cyclistes "
+     "à Paris contre 1 038 en 2022). Ne pas la comparer aux autres années."},
     {"annees": [2018, None], "texte": "À partir de 2018, cette base compte nettement moins de cyclistes que "
      "les bilans officiels de l'ONISR (par exemple 156 tués en 2023 contre 226). Elle semble ne pas inclure "
      "les vélos à assistance électrique, codés à part depuis 2018. Les années 2018 et suivantes ne sont donc "
