@@ -43,7 +43,7 @@ def test_emplacements(res):
     assert v["accroche"][pts[0]["accroche"]] == "cadre et roue"
     assert pts[0]["capacite"] == 10 and pts[0]["gratuit"] == 1 and pts[0]["couverture"] == 0
     assert pts[1]["capacite"] is None
-    assert "ferme" in v["protection"][pts[2]["protection"]]
+    assert v["protection"][pts[2]["protection"]] == "box individuel fermé"   # accents conservés
     osm = meta["sources"]["stationnement_osm"]
     assert osm["statut"] == "ok" and "3 emplacements" in osm["detail"]
     assert osm["coherence"]["total_osm"] == 16 and osm["coherence"]["total_officiel"] == 1900

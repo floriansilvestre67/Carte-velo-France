@@ -179,15 +179,17 @@ def _entier(v):
 
 def lire_emplacements(chemin: Path, codes_valides: set[str], localisateur=None) -> dict:
     valeurs = {"accroche": [], "mobilier": [], "protection": [], "acces": []}
+    positions: dict[str, dict[str, int]] = {k: {} for k in valeurs}
 
     def indice(champ, v):
-        t = _norm(v)
-        if not t:
+        """Indice du libellé dans la liste du champ ; le libellé publié garde ses accents."""
+        cle = _norm(v)
+        if not cle:
             return -1
-        liste = valeurs[champ]
-        if t not in liste:
-            liste.append(t)
-        return liste.index(t)
+        if cle not in positions[champ]:
+            positions[champ][cle] = len(valeurs[champ])
+            valeurs[champ].append(" ".join(str(v).replace("_", " ").split()).lower())
+        return positions[champ][cle]
 
     par_dep: dict[str, list] = {}
     stats = {"points": 0, "hors_metropole": 0, "sans_capacite": 0, "places": {}}
