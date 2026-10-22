@@ -31,6 +31,11 @@
       </section>
 
       <section class="reglages">
+        <div class="champ champ-ville">
+          <label class="titre-champ" for="recherche-ville">Rechercher une ville</label>
+          <input type="search" id="recherche-ville" placeholder="Nom ou code postal" spellcheck="false">
+          <ul id="suggestions-ville" class="suggestions" hidden></ul>
+        </div>
         <div class="champ">
           <label class="titre-champ" for="choix-indicateur">Afficher sur la carte</label>
           <select id="choix-indicateur"></select>
@@ -53,6 +58,8 @@
       </section>
 
       <section class="fiche resume-region" id="resume-region" hidden aria-live="polite"></section>
+
+      <section class="fiche fiche-ville" id="fiche-ville" hidden aria-live="polite" tabindex="-1"></section>
 
       <section class="fiche" id="fiche" hidden aria-live="polite" tabindex="-1"></section>
 
@@ -90,6 +97,7 @@
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <script src="js/ville.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

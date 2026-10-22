@@ -33,9 +33,10 @@
       <label for="f-dep">Département</label>
       <select id="f-dep"><option value="">Tous</option></select>
     </div>
-    <div class="filtre">
-      <label for="f-ville">Commune</label>
-      <select id="f-ville" disabled><option value="">Toutes</option></select>
+    <div class="filtre champ-ville">
+      <label for="f-ville">Ville</label>
+      <input type="search" id="f-ville" placeholder="Nom ou code postal" spellcheck="false">
+      <ul id="f-ville-suggestions" class="suggestions" hidden></ul>
     </div>
     <div class="filtre" id="bloc-arr" hidden>
       <label for="f-arr">Arrondissement</label>
@@ -159,6 +160,7 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+  <script src="js/ville.js"></script>
   <script src="js/statistiques.js"></script>
 </body>
 </html>

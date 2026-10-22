@@ -8,7 +8,9 @@ Deux usages :
 
 from __future__ import annotations
 
-URL_COMMUNES = "https://geo.api.gouv.fr/communes?fields=nom,code,population,surface,codeDepartement"
+URL_COMMUNES = "https://geo.api.gouv.fr/communes?fields=nom,code,codesPostaux,population,surface,codeDepartement"
+URL_ARRONDISSEMENTS = ("https://geo.api.gouv.fr/communes?type=arrondissement-municipal"
+                       "&fields=nom,code,codesPostaux,population,codeDepartement")
 # Communes déléguées et associées : anciennes communes rattachées à une commune nouvelle.
 URL_DELEGUEES = "https://geo.api.gouv.fr/communes?type=commune-deleguee&fields=code,nom,chefLieu"
 URL_ASSOCIEES = "https://geo.api.gouv.fr/communes?type=commune-associee&fields=code,nom,chefLieu"
@@ -104,3 +106,22 @@ class Correspondance:
         if actuelle:
             return self.actuelles[actuelle].get("codeDepartement") or departement_du_code(actuelle)
         return departement_du_code(str(code).strip().upper().zfill(5)) if code else None
+
+
+def index_recherche(communes: list[dict], arrondissements: list[dict], codes_valides: set[str]) -> dict:
+    """Liste compacte pour la recherche de ville : nom, codes postaux, population.
+
+    Les arrondissements de Paris, Lyon et Marseille y figurent aussi, rattachés à leur
+    commune entière (taper « Paris » propose Paris ; « 75008 » propose le 8e arrondissement).
+    """
+    lignes = []
+    for c in communes:
+        if c.get("codeDepartement") in codes_valides and c.get("code"):
+            lignes.append([c["code"], c.get("nom") or c["code"], " ".join(c.get("codesPostaux") or []),
+                           c.get("population") or 0, ""])
+    for a in arrondissements:
+        if a.get("codeDepartement") in codes_valides and a.get("code"):
+            lignes.append([a["code"], a.get("nom") or a["code"], " ".join(a.get("codesPostaux") or []),
+                           a.get("population") or 0, commune_entiere(a["code"])])
+    lignes.sort(key=lambda l: -l[3])
+    return {"champs": ["code", "nom", "codes_postaux", "population", "commune_entiere"], "communes": lignes}

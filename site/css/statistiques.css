@@ -100,3 +100,6 @@ table.classable thead th[aria-sort="ascending"] button::after { content: "▲"; 
   .chiffre { padding-left: 0 !important; border-left: 0 !important; }
   .cadre-graphe.haut { height: 440px; }
 }
+
+.filtre input[type="search"] { min-width: 220px; padding-top: 7px; padding-bottom: 7px; }
+@media (max-width: 640px) { .filtre input[type="search"] { min-width: 0; } }

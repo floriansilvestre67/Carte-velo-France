@@ -18,6 +18,10 @@
     indicateur: "score",
     selection: null,     // code du département affiché dans la fiche
     region: null,        // code de la région filtrée (null = toute la France)
+    ville: null,         // code INSEE de la ville choisie (commune entière)
+    arr: null,           // arrondissement éventuel (Paris, Lyon, Marseille)
+    calqueVille: null,   // contour de la ville
+    anneeVille: null,    // année choisie dans la fiche Ville
     partie: "haut",      // onglet du classement
     seuils: [],
     couches: {},         // code -> couche Leaflet
@@ -305,7 +309,7 @@
 
   function majFiche() {
     var fiche = $("fiche");
-    if (!etat.selection) { fiche.hidden = true; return; }
+    if (!etat.selection || etat.ville) { fiche.hidden = true; return; }
     var p = proprietes().find(function (q) { return q.code === etat.selection; });
     if (!p) { fiche.hidden = true; return; }
 
@@ -348,6 +352,7 @@
   }
 
   function choisirDepartement(code, recentrer) {
+    if (etat.ville && RechercheVille.departement(etat.ville) !== code) choisirVille(null);
     etat.selection = code || null;
     var p = etat.selection && proprietes().find(function (q) { return q.code === etat.selection; });
     if (p && !dansRegion(p)) choisirRegion(null, false);
@@ -449,17 +454,220 @@
 
   function lireAdresse() {
     var params = new URLSearchParams(location.hash.slice(1));
-    return { ind: params.get("ind"), dep: params.get("dep"), reg: params.get("reg") };
+    var requete = new URLSearchParams(location.search);
+    return { ind: params.get("ind"), dep: params.get("dep"), reg: params.get("reg"),
+             ville: requete.get("ville"), arr: requete.get("arr") };
   }
 
+  /* La ville est dans la requête (?ville=CODE_INSEE, comme sur la page Statistiques),
+     le reste de l'état de la carte dans l'ancre (#ind=…&reg=…&dep=…). */
   function majAdresse() {
     var params = new URLSearchParams();
     if (etat.indicateur !== "score") params.set("ind", etat.indicateur);
     if (etat.region) params.set("reg", etat.region);
     if (etat.selection) params.set("dep", etat.selection);
-    var h = params.toString();
-    history.replaceState(null, "", h ? "#" + h : location.pathname + location.search);
+    var requete = new URLSearchParams();
+    if (etat.ville) requete.set("ville", etat.ville);
+    if (etat.ville && etat.arr) requete.set("arr", etat.arr);
+    var q = requete.toString(), h = params.toString();
+    history.replaceState(null, "", location.pathname + (q ? "?" + q : "") + (h ? "#" + h : ""));
+    var lien = $("lien-stats");
+    if (lien) {
+      var st = new URLSearchParams();
+      if (etat.ville) { st.set("ville", etat.ville); if (etat.arr) st.set("arr", etat.arr); }
+      else if (etat.selection) st.set("dep", etat.selection);
+      else if (etat.region) st.set("region", etat.region);
+      lien.href = "statistiques.html" + (st.toString() ? "?" + st.toString() : "");
+    }
   }
+
+  // ---------------------------------------------------------------- ville
+
+  var fichiersDep = {};
+  function fichierDep(chemin) {
+    if (!fichiersDep[chemin]) {
+      fichiersDep[chemin] = fetch("data/" + chemin).then(function (r) { if (!r.ok) throw new Error(chemin); return r.json(); });
+      fichiersDep[chemin].catch(function () { delete fichiersDep[chemin]; });
+    }
+    return fichiersDep[chemin];
+  }
+
+  var SEUIL_RANG = 2000; // habitants : en dessous, les rangs par habitant n'ont pas de sens
+
+  function choisirVille(code, arr, recentrer) {
+    if (etat.calqueVille) { carte.removeLayer(etat.calqueVille); etat.calqueVille = null; }
+    etat.ville = code || null;
+    etat.arr = code ? (arr || null) : null;
+    if (!etat.ville) {
+      $("fiche-ville").hidden = true;
+      rechercheVille.afficher("");
+      majFiche();
+      majAdresse();
+      return;
+    }
+    var dep = RechercheVille.departement(etat.ville);
+    // La ville doit rester compatible avec le filtre régional
+    var pDep = proprietes().find(function (q) { return q.code === dep; });
+    if (pDep && !dansRegion(pDep)) choisirRegion(null, false);
+    etat.selection = pDep ? dep : null;
+    $("choix-dep").value = etat.selection || "";
+    recolorer();
+    majFiche();
+    majAdresse();
+    var fiche = $("fiche-ville");
+    fiche.hidden = false;
+    fiche.innerHTML = '<p class="indispo">Chargement de la fiche…</p>';
+    Promise.all([fichierDep("communes/" + dep + ".json"),
+                 fichierDep("contours/" + dep + ".geojson").catch(function () { return null; })])
+      .then(function (res) {
+        if (etat.ville !== code) return;          // une autre ville a été choisie entre-temps
+        var f = res[0], contours = res[1];
+        var c = f.communes[code];
+        if (!c) throw new Error("commune absente");
+        rechercheVille.afficher(c.n || code);
+        var forme = contours && contours.features.find(function (x) { return x.properties.code === code; });
+        if (forme) {
+          etat.calqueVille = L.geoJSON(forme, { interactive: false,
+            style: { color: "#1f2a2e", weight: 3, fill: true, fillColor: "#ffffff", fillOpacity: 0.12 } }).addTo(carte);
+          if (recentrer !== false) carte.flyToBounds(etat.calqueVille.getBounds(), { padding: [30, 30], maxZoom: 13, duration: 0.6 });
+        }
+        dessinerFicheVille(f, code, forme);
+        if (window.matchMedia("(max-width: 820px)").matches) fiche.scrollIntoView({ behavior: "smooth", block: "start" });
+      }).catch(function () {
+        fiche.innerHTML = '<p class="message-erreur" role="alert">La fiche de cette ville n\'a pas pu être chargée. Réessayez dans quelques minutes.</p>';
+      });
+  }
+
+  /* Rang de la ville parmi les communes du département de plus de SEUIL_RANG habitants. */
+  function rangDansDep(f, code, valeur) {
+    var c = f.communes[code];
+    if (!c || !c.p || c.p < SEUIL_RANG) return null;
+    var v = valeur(c);
+    if (v == null) return null;
+    var autres = Object.keys(f.communes).map(function (k) { return f.communes[k]; })
+      .filter(function (x) { return x.p >= SEUIL_RANG; }).map(valeur).filter(function (x) { return x != null; });
+    return { rang: 1 + autres.filter(function (x) { return x > v; }).length, sur: autres.length };
+  }
+
+  function accidentsVille(f, code) {
+    var champs = f.accidents.champs, k = {};
+    champs.forEach(function (ch, i) { k[ch] = i; });
+    var par = {};
+    f.accidents.lignes.forEach(function (l) {
+      if (l[k.com] !== code) return;
+      var a = par[l[k.an]] = par[l[k.an]] || { acc: 0, tues: 0, blesses: 0 };
+      a.acc++; a.tues += l[k.tues]; a.blesses += l[k.hosp] + l[k.legers];
+    });
+    return par;
+  }
+
+  function dessinerFicheVille(f, code, forme) {
+    var c = f.communes[code], fmt0 = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 });
+    var fmt1 = new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+    var fmt2 = new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    var indispo = '<span class="indispo">indisponible</span>';
+    var dep = proprietes().find(function (q) { return q.code === f.dep; }) || {};
+    var km = c.km ? c.km.t : null, pop = c.p;
+    var ligne = function (lib, val, rang) {
+      return '<tr><th scope="row">' + lib + "</th><td>" + (val == null ? indispo : echapper(val)) +
+        (rang ? '<span class="rang">' + ordinal(rang.rang) + " sur " + rang.sur + " dans le département</span>" : "") + "</td></tr>";
+    };
+    var html = '<div class="fiche-tete"><h2>' + echapper(c.n || code) + ' <span class="code">(' + code + ")</span></h2>" +
+      '<button type="button" class="bouton-fermer" id="fermer-ville" aria-label="Fermer la fiche de la ville">×</button></div>' +
+      '<p class="sous-titre-ville">' + echapper(dep.nom || f.dep) + (dep.region_nom ? ", " + echapper(dep.region_nom) : "") + "</p>";
+    if (etat.arr) {
+      html += '<p class="note-ville">Chiffres pour toute la commune. Le détail des accidents par arrondissement est sur la page Statistiques.</p>';
+    }
+    if (!forme) html += '<p class="note-ville">Contour de la commune indisponible.</p>';
+    html += "<table>";
+    html += '<tr class="groupe"><th scope="rowgroup" colspan="2">Population et surface</th></tr>';
+    html += ligne("Population", pop != null ? fmt0.format(pop) + " hab." : null);
+    html += ligne("Surface", c.s != null ? fmt1.format(c.s) + " km²" : null);
+    html += '<tr class="groupe"><th scope="rowgroup" colspan="2">Aménagements cyclables</th></tr>';
+    html += ligne("Total", km != null ? fmt1.format(km) + " km" : null,
+                  rangDansDep(f, code, function (x) { return x.km ? x.km.t : null; }));
+    html += ligne("Pour 10 000 habitants", km != null && pop ? fmt1.format(km / pop * 1e4) + " km" : null,
+                  rangDansDep(f, code, function (x) { return x.km && x.p ? x.km.t / x.p * 1e4 : null; }));
+    if (c.km) {
+      [["pistes", "Pistes cyclables"], ["bandes", "Bandes cyclables"], ["voies_vertes", "Voies vertes"],
+       ["double_sens", "Double-sens cyclables"], ["autres", "Autres aménagements"]].forEach(function (t) {
+        if (c.km[t[0]]) html += ligne(t[1], fmt1.format(c.km[t[0]]) + " km");
+      });
+    }
+    html += '<tr class="groupe"><th scope="rowgroup" colspan="2">Vélos en libre-service</th></tr>';
+    if (c.vls) {
+      html += ligne("Stations", fmt0.format(c.vls.st));
+      if (c.vls.zv) html += ligne("Zones de stationnement en free-floating", fmt0.format(c.vls.zv));
+      html += ligne("Vélos disponibles (relevé du jour)", fmt0.format(c.vls.v));
+    } else {
+      html += ligne("Stations", null);
+    }
+    html += "</table>";
+
+    // Accidents : sélecteur d'année, mini-graphique, ratios de l'année choisie
+    var par = accidentsVille(f, code);
+    var annees = Object.keys(par).map(Number);
+    var srcAcc = etat.meta.sources.accidents || {};
+    html += '<h3 class="titre-section-ville">Accidents de vélo</h3>';
+    if (!srcAcc.statut || srcAcc.statut === "indisponible" || !srcAcc.annees) {
+      html += '<p class="indispo">Données d\'accidents indisponibles.</p>';
+    } else {
+      var premiere = srcAcc.annees[0], derniere = srcAcc.annees[1];
+      var liste = [];
+      for (var a = premiere; a <= derniere; a++) liste.push(a);
+      if (!etat.anneeVille || liste.indexOf(etat.anneeVille) < 0) etat.anneeVille = derniere;
+      html += '<div class="champ-annee"><label for="annee-ville">Année</label> <select id="annee-ville">' +
+        liste.slice().reverse().map(function (a) { return '<option value="' + a + '">' + a + "</option>"; }).join("") + "</select></div>";
+      html += '<div id="acc-annee"></div>';
+      html += '<figure class="mini-graphe"><figcaption>Accidents par année, ' + premiere + "–" + derniere + "</figcaption>" +
+        miniGraphe(liste, par) + "</figure>";
+      html += '<details><summary>Voir les données</summary><table class="donnees-ville"><thead><tr><th scope="col">Année</th><th scope="col">Accidents</th><th scope="col">Tués</th><th scope="col">Blessés</th></tr></thead><tbody>' +
+        liste.map(function (a) { var v = par[a] || { acc: 0, tues: 0, blesses: 0 };
+          return '<tr><th scope="row">' + a + "</th><td>" + v.acc + "</td><td>" + v.tues + "</td><td>" + v.blesses + "</td></tr>"; }).join("") +
+        "</tbody></table></details>";
+      html += '<p class="note-ville">À partir de 2018, la source sous-estime les accidents (vélos électriques probablement absents).</p>';
+    }
+    var st = new URLSearchParams({ ville: code });
+    if (etat.arr) st.set("arr", etat.arr);
+    html += '<p><a class="lien-stats-ville" href="statistiques.html?' + st.toString() + '">Voir toutes les statistiques de cette ville</a></p>';
+    $("fiche-ville").innerHTML = html;
+    $("fermer-ville").addEventListener("click", function () { choisirVille(null); });
+    var sel = $("annee-ville");
+    if (sel) {
+      sel.value = etat.anneeVille;
+      var majAnnee = function () {
+        var an = etat.anneeVille, v = par[an] || { acc: 0, tues: 0, blesses: 0 };
+        $("acc-annee").innerHTML = "<table>" +
+          ligne("Accidents en " + an, fmt0.format(v.acc)) +
+          ligne("Cyclistes tués", fmt0.format(v.tues)) +
+          ligne("Cyclistes blessés", fmt0.format(v.blesses)) +
+          ligne("Pour 100 000 habitants", pop ? fmt1.format(v.acc / pop * 1e5) + (v.acc < 10 ? "*" : "") : null) +
+          ligne("Pour 100 km d'aménagements", km ? fmt2.format(v.acc / km * 100) + (v.acc < 10 ? "*" : "") : null) +
+          "</table>" + (v.acc < 10 ? '<p class="note-ville">* Moins de 10 accidents cette année-là : ratio peu significatif.</p>' : "");
+        $("fiche-ville").querySelectorAll(".mini-graphe rect[data-an]").forEach(function (r) {
+          r.setAttribute("class", Number(r.getAttribute("data-an")) === an ? "barre-active" : "");
+        });
+      };
+      sel.addEventListener("change", function () { etat.anneeVille = Number(sel.value); majAnnee(); });
+      majAnnee();
+    }
+  }
+
+  /* Petit histogramme SVG (pas de bibliothèque sur la page carte) */
+  function miniGraphe(annees, par) {
+    var max = Math.max.apply(null, annees.map(function (a) { return (par[a] || {}).acc || 0; }).concat([1]));
+    var l = 300, h = 80, pas = l / annees.length;
+    var barres = annees.map(function (a, i) {
+      var v = (par[a] || {}).acc || 0, bh = Math.max(v ? 2 : 0, v / max * (h - 14));
+      return '<rect data-an="' + a + '" x="' + (i * pas + 1).toFixed(1) + '" y="' + (h - bh).toFixed(1) +
+        '" width="' + Math.max(1, pas - 2).toFixed(1) + '" height="' + bh.toFixed(1) + '"><title>' + a + " : " + v + " accident" + (v > 1 ? "s" : "") + "</title></rect>";
+    }).join("");
+    return '<svg viewBox="0 0 ' + l + " " + (h + 14) + '" role="img" aria-label="Histogramme des accidents par année ; valeurs dans le tableau ci-dessous">' +
+      barres + '<text x="0" y="' + (h + 12) + '">' + annees[0] + '</text><text x="' + l + '" y="' + (h + 12) +
+      '" text-anchor="end">' + annees[annees.length - 1] + '</text><text x="0" y="10">max ' + max + "</text></svg>";
+  }
+
+  var rechercheVille = null;
 
   // ---------------------------------------------------------------- calque VLS
 
@@ -485,7 +693,9 @@
           fillColor: "#0e7c5a", fillOpacity: 1 });
         var velos = s[3] == null ? "disponibilité inconnue"
           : s[3] + (s[3] > 1 ? " vélos disponibles" : " vélo disponible");
-        m.bindPopup("<strong>" + echapper(s[2] || "Station") + "</strong><br>" + echapper(velos) +
+        if (s[5] === 1) m.setStyle({ fillColor: "#ffffff", color: "#0e7c5a", weight: 2 });
+        m.bindPopup("<strong>" + echapper(s[2] || "Station") + "</strong><br>" +
+          (s[5] === 1 ? "Zone de stationnement d'un service en free-floating<br>" : "") + echapper(velos) +
           "<br><small>" + echapper(donnees.systemes[s[4]] || "") + "</small>");
         return m;
       });
@@ -553,10 +763,16 @@
     dessinerDepartements();
     afficherMaj();
 
+    rechercheVille = RechercheVille.attacher($("recherche-ville"), $("suggestions-ville"), function (v) {
+      etat.anneeVille = null;
+      choisirVille(v.entiere || v.code, v.entiere ? v.code : null, true);
+    });
+
     var adresse = lireAdresse();
     choisirIndicateur(adresse.ind || "score");
-    if (adresse.reg) choisirRegion(adresse.reg, !adresse.dep);
-    if (adresse.dep && etat.couches[adresse.dep]) choisirDepartement(adresse.dep, true);
+    if (adresse.reg) choisirRegion(adresse.reg, !adresse.dep && !adresse.ville);
+    if (adresse.ville && /^[0-9AB]{5}$/i.test(adresse.ville)) choisirVille(adresse.ville.toUpperCase(), adresse.arr, true);
+    else if (adresse.dep && etat.couches[adresse.dep]) choisirDepartement(adresse.dep, true);
 
     $("choix-indicateur").addEventListener("change", function (e) { choisirIndicateur(e.target.value); });
     $("choix-dep").addEventListener("change", function (e) { choisirDepartement(e.target.value, true); });

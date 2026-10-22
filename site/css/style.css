@@ -90,6 +90,41 @@ select {
 }
 select + label.titre-champ, .champ + .champ { margin-top: 14px; }
 
+/* ---------- Recherche de ville (aussi utilisée sur la page Statistiques) ---------- */
+
+.champ-ville { position: relative; }
+input[type="search"] {
+  width: 100%; font: inherit; color: var(--encre); padding: 9px 12px;
+  border: 1px solid #b9c5c2; border-radius: var(--rayon); background: var(--surface);
+}
+.suggestions {
+  position: absolute; left: 0; right: 0; top: 100%; z-index: 1500; margin: 4px 0 0; padding: 4px 0; list-style: none;
+  background: var(--surface); border: 1px solid #b9c5c2; border-radius: var(--rayon);
+  box-shadow: 0 6px 18px rgba(31, 42, 46, 0.14); max-height: 320px; overflow-y: auto;
+}
+.suggestions li { padding: 7px 12px; cursor: pointer; display: flex; justify-content: space-between; gap: 12px; }
+.suggestions li .info { color: var(--encre-douce); font-size: 0.85rem; white-space: nowrap; }
+.suggestions li[aria-selected="true"], .suggestions li:hover { background: #eaf5f0; }
+.suggestions li.aucun { cursor: default; color: var(--encre-douce); }
+
+/* ---------- Fiche Ville ---------- */
+
+.fiche-ville { background: #fbfcfc; border-left: 4px solid var(--encre); }
+.sous-titre-ville { margin: 2px 0 8px; color: var(--encre-douce); font-size: 0.92rem; }
+.note-ville { font-size: 0.85rem; color: var(--encre-douce); margin: 6px 0; }
+.titre-section-ville { font-size: 1rem; margin: 18px 0 6px; padding-bottom: 4px; border-bottom: 1px solid var(--encre); }
+.champ-annee { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; font-weight: 700; font-size: 0.9rem; }
+.champ-annee select { width: auto; padding-top: 5px; padding-bottom: 5px; }
+.mini-graphe { margin: 10px 0 0; }
+.mini-graphe figcaption { font-size: 0.85rem; color: var(--encre-douce); margin-bottom: 4px; }
+.mini-graphe svg { width: 100%; height: auto; display: block; }
+.mini-graphe rect { fill: #86b6ef; }
+.mini-graphe rect.barre-active { fill: #0d366b; }
+.mini-graphe text { font-size: 10px; fill: var(--encre-douce); font-family: var(--police); }
+.fiche-ville details summary { cursor: pointer; color: var(--vert-fonce); font-size: 0.88rem; margin-top: 6px; }
+.donnees-ville { font-size: 0.85rem; }
+.lien-stats-ville { font-weight: 700; }
+
 /* ---------- Légende : une bande segmentée, comme un marquage au sol ---------- */
 
 .legende-titre { font-weight: 700; margin: 0 0 8px; }
@@ -215,6 +250,7 @@ select + label.titre-champ, .champ + .champ { margin-top: 14px; }
   .reglages { order: 1; }
   .legende { order: 3; }
   .resume-region { order: 4; }
+  .fiche-ville { order: 4; }
   .fiche { order: 4; }
   .calques-section { order: 5; }
   .classement-section { order: 6; }

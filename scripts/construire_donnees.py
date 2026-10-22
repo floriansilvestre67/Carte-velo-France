@@ -28,7 +28,7 @@ from pathlib import Path
 
 import indicateurs
 from reseau import ClientHTTP
-from sources import accidents, amenagements, communes, departements, regions, vls
+from sources import accidents, amenagements, communes, contours_communes, departements, regions, vls
 
 TAILLE_MAX = 50 * 1024 * 1024  # 50 Mo par fichier publié
 
@@ -130,12 +130,17 @@ def construire(client, sortie: Path, travail: Path, url_precedent: str | None = 
     journal("2/5 Population et surface (geo.api.gouv.fr)…")
     table_communes: dict[str, str] = {}
     liste_communes: list[dict] = []
+    arrondissements: list[dict] = []
     correspondance = None
     try:
         liste = communes.charger_communes(client)
         liste_communes = liste
         table_communes = communes.correspondance_commune_departement(liste)
         anciennes = communes.charger_anciennes(client)
+        try:
+            arrondissements = client.get_json(communes.URL_ARRONDISSEMENTS) or []
+        except Exception:
+            arrondissements = []
         correspondance = communes.Correspondance(liste, anciennes)
         journal(f"  {len(liste)} communes, {len(anciennes)} anciennes communes rattachées")
         agg = communes.agreger_par_departement(liste)
@@ -163,6 +168,28 @@ def construire(client, sortie: Path, travail: Path, url_precedent: str | None = 
     except Exception as e:
         journal(f"  ✗ {e}")
         appliquer_secours("regions", CLES_REGIONS, e)
+
+    # 2 ter. Contours des communes (recherche de ville, rattachement des points)
+    journal("   Contours des communes (Etalab)…")
+    contours_par_dep, localisateur_communes = None, None
+    try:
+        res_c = contours_communes.calculer(client, travail, codes)
+        contours_par_dep = res_c["par_dep"]
+        sources_meta["contours_communes"] = {"statut": "ok", "url": contours_communes.URL_CONTOURS,
+                                             "detail": f"{res_c['diagnostic']['communes']} communes",
+                                             "diagnostic": res_c["diagnostic"]}
+        journal(f"  {res_c['diagnostic']}")
+    except Exception as e:
+        journal(f"  ✗ {e}")
+        anciens = {dep: fichier_precedent(client, url_precedent, f"contours/{dep}.geojson") for dep in codes}
+        if all(anciens.values()):
+            contours_par_dep = {dep: f.get("features", []) for dep, f in anciens.items()}
+            sources_meta["contours_communes"] = {"statut": "reprise", "url": contours_communes.URL_CONTOURS,
+                                                 "detail": f"Source injoignable ({e}) : contours repris de la veille."}
+        else:
+            sources_meta["contours_communes"] = {"statut": "indisponible", "detail": f"Source injoignable : {e}"}
+    if contours_par_dep:
+        localisateur_communes = contours_communes.LocalisateurCommune(contours_par_dep)
 
     # 3. Aménagements
     km_communes: dict[str, dict] | None = None
@@ -192,10 +219,12 @@ def construire(client, sortie: Path, travail: Path, url_precedent: str | None = 
         appliquer_secours("amenagements", CLES_AMENAGEMENTS, e)
 
     # 4. VLS
+    vls_communes: dict[str, dict] | None = None
     journal("4/5 Vélos en libre-service (GBFS)…")
     stations_carte = {"systemes": [], "stations": []}
     try:
-        res = vls.calculer(client, localisateur, codes)
+        res = vls.calculer(client, localisateur, codes, localisateur_communes=localisateur_communes)
+        vls_communes = res["par_commune"] if localisateur_communes is not None else None
         for code in codes:
             props[code]["vls_stations"] = res["par_dep"][code]["stations"]
             props[code]["vls_velos"] = res["par_dep"][code]["velos"]
@@ -226,6 +255,7 @@ def construire(client, sortie: Path, travail: Path, url_precedent: str | None = 
         annees = sorted({a["an"] for a in accs})
         sources_meta["accidents"] = {
             "statut": "ok", "url": accidents.URL_PAGE_JEU, "date_donnees": info["maj"],
+            "annees": [annees[0], annees[-1]],
             "detail": f"{st['accidents']:,} accidents ({st['lignes']:,} cyclistes) de {annees[0]} à {annees[-1]} ; "
                       f"{st.get('lignes_hors_metropole', 0):,} lignes hors métropole écartées".replace(",", " ")}
         journal(f"  {st}")
@@ -240,7 +270,8 @@ def construire(client, sortie: Path, travail: Path, url_precedent: str | None = 
     region_de = {c: p.get("region") for c, p in par_code.items()}
 
     ecrire_accidents_et_communes(client, sortie, url_precedent, sources_meta, deps, par_code, region_de,
-                                 liste_communes, correspondance, km_communes, accs)
+                                 liste_communes, correspondance, km_communes, accs, vls_communes)
+    ecrire_communes_carte(client, sortie, url_precedent, codes, liste_communes, arrondissements, contours_par_dep)
 
     geojson = {"type": "FeatureCollection", "features": [
         {"type": "Feature", "properties": par_code[d["code"]], "geometry": d["geometrie"]} for d in deps]}
@@ -254,8 +285,26 @@ def construire(client, sortie: Path, travail: Path, url_precedent: str | None = 
     return meta
 
 
+def ecrire_communes_carte(client, sortie, url_precedent, codes, liste_communes, arrondissements,
+                          contours_par_dep) -> None:
+    """communes-index.json (recherche de ville) et contours/{dep}.geojson."""
+    if liste_communes:
+        index = communes.index_recherche(liste_communes, arrondissements, set(codes))
+    else:
+        index = fichier_precedent(client, url_precedent, "communes-index.json")
+    if index:
+        taille = ecrire_json(sortie / "communes-index.json", index)
+        journal(f"  → communes-index.json ({taille / 1024:.0f} Ko)")
+    if contours_par_dep:
+        total = 0
+        for dep in codes:
+            total += ecrire_json(sortie / "contours" / f"{dep}.geojson",
+                                 {"type": "FeatureCollection", "features": contours_par_dep.get(dep, [])})
+        journal(f"  → contours/*.geojson ({total / 1024:.0f} Ko au total)")
+
+
 def ecrire_accidents_et_communes(client, sortie, url_precedent, sources_meta, deps, par_code, region_de,
-                                 liste_communes, correspondance, km_communes, accs) -> None:
+                                 liste_communes, correspondance, km_communes, accs, vls_communes=None) -> None:
     """Écrit accidents/national.json et communes/{dep}.json.
 
     Chaque composante manquante aujourd'hui (liste des communes, km par commune,
@@ -323,6 +372,15 @@ def ecrire_accidents_et_communes(client, sortie, url_precedent, sources_meta, de
                 km = ((ancien.get("communes") or {}).get(code_com) or {}).get("km")
                 if km is not None:
                     fiche["km"] = km
+        # Vélos en libre-service par commune (st : stations, zv : zones virtuelles, v : vélos)
+        if vls_communes is not None:
+            for code_com, fiche in communes_dep.items():
+                fiche["vls"] = vls_communes.get(code_com) or {"st": 0, "zv": 0, "v": 0}
+        else:
+            ancien_vls = (precedent_dep(dep).get("communes") or {})
+            for code_com, fiche in communes_dep.items():
+                if (ancien_vls.get(code_com) or {}).get("vls") is not None:
+                    fiche["vls"] = ancien_vls[code_com]["vls"]
         if accs:
             lignes = [accidents.enregistrement(a, correspondance) for a in accs if a["dep"] == dep]
         else:

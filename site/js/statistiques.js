@@ -116,20 +116,15 @@
     sel.value = etat.dep;
   }
 
+  /* Affiche le nom de la ville choisie dans le champ de recherche. */
   function remplirCommunes() {
-    var sel = $("f-ville");
-    sel.innerHTML = "";
-    option(sel, "", "Toutes");
-    if (!etat.dep) { sel.disabled = true; return Promise.resolve(); }
-    sel.disabled = true;
-    return fichierDep(etat.dep).then(function (f) {
-      Object.keys(f.communes).map(function (c) { return { code: c, nom: f.communes[c].n || c }; })
-        .sort(function (a, b) { return a.nom.localeCompare(b.nom, "fr"); })
-        .forEach(function (c) { option(sel, c.code, c.nom); });
-      sel.disabled = false;
-      sel.value = etat.ville;
-    }).catch(function () { sel.disabled = true; });
+    if (!etat.ville) { recherche.afficher(""); return Promise.resolve(); }
+    return fichierDep(depDeCommune(etat.ville)).then(function (f) {
+      recherche.afficher((f.communes[etat.ville] || {}).n || etat.ville);
+    }).catch(function () { recherche.afficher(etat.ville); });
   }
+
+  var recherche = { afficher: function () {} };
 
   function remplirArrondissements() {
     var bloc = $("bloc-arr"), sel = $("f-arr");
@@ -645,7 +640,18 @@
       if (etat.dep) etat.region = (etat.nat.zones_info["D" + etat.dep].parent || "").slice(1);
       rendre();
     });
-    $("f-ville").addEventListener("change", function (e) { etat.ville = e.target.value; etat.arr = ""; rendre(); });
+    recherche = RechercheVille.attacher($("f-ville"), $("f-ville-suggestions"), function (v) {
+      etat.ville = v.entiere || v.code;
+      etat.arr = v.entiere ? v.code : "";
+      etat.dep = depDeCommune(etat.ville);
+      var zi = etat.nat.zones_info["D" + etat.dep];
+      if (!zi) { etat.ville = ""; etat.arr = ""; etat.dep = ""; }
+      else etat.region = (zi.parent || "").slice(1);
+      rendre();
+    });
+    $("f-ville").addEventListener("search", function () {     // bouton « effacer » du champ
+      if (!$("f-ville").value && etat.ville) { etat.ville = ""; etat.arr = ""; rendre(); }
+    });
     $("f-arr").addEventListener("change", function (e) { etat.arr = e.target.value; rendre(); });
     $("f-debut").addEventListener("change", function (e) {
       etat.debut = parseInt(e.target.value, 10); if (etat.debut > etat.fin) etat.fin = etat.debut; rendre();

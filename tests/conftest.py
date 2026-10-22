@@ -8,6 +8,7 @@ Le « monde fictif » :
     plus un jeu d'autopartage à ignorer.
 """
 
+import gzip
 import json
 import sys
 from pathlib import Path
@@ -17,7 +18,7 @@ import pytest
 RACINE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RACINE / "scripts"))
 
-from sources import accidents, amenagements, communes, departements, regions, vls  # noqa: E402
+from sources import accidents, amenagements, communes, contours_communes, departements, regions, vls  # noqa: E402
 
 CODES = [f"{i:02d}" for i in range(1, 96) if i != 20] + ["2A", "2B"]
 TAILLE = 0.5  # degrés
@@ -55,11 +56,34 @@ def contours():
     return {"type": "FeatureCollection", "features": feats}
 
 
+def contours_communes_fictifs():
+    """Chaque département est découpé en 12 communes (grille 4 × 3).
+    Paris n'est fourni que par deux arrondissements (moitiés gauche et droite), à fusionner."""
+    feats = []
+    for code in CODES:
+        lon0, lat0 = carre(code)
+        if code == "75":
+            for k, (a, b) in enumerate([(0, 0.25), (0.25, 0.5)], start=1):
+                anneau = [[lon0 + a, lat0], [lon0 + b, lat0], [lon0 + b, lat0 + TAILLE], [lon0 + a, lat0 + TAILLE], [lon0 + a, lat0]]
+                feats.append({"type": "Feature", "properties": {"code": f"7510{k}", "nom": f"Paris {k}e"},
+                              "geometry": {"type": "Polygon", "coordinates": [anneau]}})
+            continue
+        for k in range(12):
+            w, h = TAILLE / 4, TAILLE / 3
+            x, y = lon0 + (k % 4) * w, lat0 + (k // 4) * h
+            anneau = [[x, y], [x + w, y], [x + w, y + h], [x, y + h], [x, y]]
+            code_com = "69123" if (code == "69" and k == 0) else f"{code}{k + 1:03d}"
+            feats.append({"type": "Feature", "properties": {"code": code_com, "nom": "x", "departement": code},
+                          "geometry": {"type": "Polygon", "coordinates": [anneau]}})
+    return {"type": "FeatureCollection", "features": feats}
+
+
 def liste_communes():
     liste = []
     for n, code in enumerate(CODES):
         for k in range(1, 13):
             liste.append({"code": f"{code}{k:03d}", "nom": f"Commune {code}-{k}", "codeDepartement": code,
+                          "codesPostaux": [f"{code.replace('A', '0').replace('B', '0')}{k:03d}"],
                           "population": 1000 * (n + 1) + k, "surface": 2500.0})  # 25 km²
     # Communes à arrondissements, avec leurs vrais codes
     liste.append({"code": "75056", "nom": "Paris", "codeDepartement": "75", "population": 2100000, "surface": 10540.0})
@@ -147,6 +171,13 @@ def monde(tmp_path):
     urls = {}
     urls[departements.URL_CONTOURS] = ecrire(d, "contours.geojson", contours())
     urls[communes.URL_COMMUNES] = ecrire(d, "communes.json", liste_communes())
+    chemin_gz = d / "communes-100m.geojson.gz"
+    with gzip.open(chemin_gz, "wt", encoding="utf-8") as f:
+        json.dump(contours_communes_fictifs(), f)
+    urls[contours_communes.URL_CONTOURS] = chemin_gz
+    urls[communes.URL_ARRONDISSEMENTS] = ecrire(d, "arrondissements.json", [
+        {"nom": "Paris 1er Arrondissement", "code": "75101", "codesPostaux": ["75001"], "population": 15000, "codeDepartement": "75"},
+        {"nom": "Lyon 3e Arrondissement", "code": "69383", "codesPostaux": ["69003"], "population": 100000, "codeDepartement": "69"}])
     urls[communes.URL_DELEGUEES] = ecrire(d, "deleguees.json", [
         {"code": "63999", "nom": "Ancienne commune", "chefLieu": "63001"},
         {"code": "63001", "nom": "Chef-lieu lui-même", "chefLieu": "63001"}])
@@ -196,7 +227,8 @@ def monde(tmp_path):
         {"vehicle_type_id": "cargo", "form_factor": "cargo_bicycle"},
         {"vehicle_type_id": "trott", "form_factor": "scooter_standing"}]}})
     urls[G + "b/info"] = ecrire(d, "b_info.json", {"data": {"stations": [
-        {"station_id": "x", "name": [{"text": "Châtelet", "language": "fr"}], "lat": s75[1], "lon": s75[0]},
+        {"station_id": "x", "name": [{"text": "Châtelet", "language": "fr"}], "lat": s75[1], "lon": s75[0],
+         "is_virtual_station": True},
         {"station_id": "y", "name": [{"text": "Trott only", "language": "fr"}], "lat": s75[1] + 0.01,
          "lon": s75[0]}]}})
     urls[G + "b/status"] = ecrire(d, "b_status.json", {"data": {"stations": [

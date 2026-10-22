@@ -203,7 +203,10 @@ def lire_systeme(client, urls: dict[str, str], nom: str, cache: dict | None = No
                 else:
                     brut = statut.get("num_bikes_available", statut.get("num_vehicles_available"))
                     velos = int(brut) if isinstance(brut, (int, float)) else None
-            stations.append({"lat": lat, "lon": lon, "nom": _texte(s.get("name")), "velos": velos})
+            # GBFS ≥ 2.1 : « is_virtual_station » = zone de stationnement d'un service en free-floating
+            virtuelle = s.get("is_virtual_station") in (True, 1, "true")
+            stations.append({"lat": lat, "lon": lon, "nom": _texte(s.get("name")), "velos": velos,
+                             "virtuelle": virtuelle})
 
     libres = []
     cle_libres = "vehicle_status" if "vehicle_status" in urls else "free_bike_status"
@@ -229,7 +232,13 @@ def lire_systeme(client, urls: dict[str, str], nom: str, cache: dict | None = No
 # 3. Agrégation par département
 # --------------------------------------------------------------------------
 
-def calculer(client, localisateur, codes_valides: set[str], travailleurs: int = 12) -> dict:
+def calculer(client, localisateur, codes_valides: set[str], travailleurs: int = 12,
+             localisateur_communes=None) -> dict:
+    """Agrège par département (et par commune si `localisateur_communes` est fourni).
+
+    Par commune, on distingue les vraies stations des zones de stationnement virtuelles
+    des services en free-floating (is_virtual_station), comptées à part.
+    """
     jeux = lister_jeux(client)
     if not jeux:
         raise ValueError("Aucun flux GBFS trouvé sur transport.data.gouv.fr")
@@ -244,6 +253,7 @@ def calculer(client, localisateur, codes_valides: set[str], travailleurs: int = 
         resultats = list(pool.map(essayer, jeux))
 
     par_dep = {code: {"stations": 0, "velos": 0} for code in codes_valides}
+    par_commune: dict[str, dict] = {}
     stations_carte, systemes, vues, signatures = [], [], set(), set()
     journal = {"jeux": len(jeux), "ok": 0, "exclus": 0, "echecs": 0, "doublons": 0, "erreurs": []}
 
@@ -273,13 +283,24 @@ def calculer(client, localisateur, codes_valides: set[str], travailleurs: int = 
                     continue  # hors métropole ou coordonnées aberrantes
                 par_dep[dep]["stations"] += 1
                 par_dep[dep]["velos"] += s["velos"] or 0
-                stations_carte.append([round(s["lat"], 5), round(s["lon"], 5), s["nom"], s["velos"], i_sys])
+                stations_carte.append([round(s["lat"], 5), round(s["lon"], 5), s["nom"], s["velos"], i_sys,
+                                       1 if s.get("virtuelle") else 0])
+                if localisateur_communes is not None:
+                    com = localisateur_communes.trouver(s["lon"], s["lat"])
+                    if com:
+                        c = par_commune.setdefault(com, {"st": 0, "zv": 0, "v": 0})
+                        c["zv" if s.get("virtuelle") else "st"] += 1
+                        c["v"] += s["velos"] or 0
             for lon, lat in sysm["libres"]:
+                if localisateur_communes is not None:
+                    com = localisateur_communes.trouver(lon, lat)
+                    if com:
+                        par_commune.setdefault(com, {"st": 0, "zv": 0, "v": 0})["v"] += 1
                 dep = localisateur.trouver(lon, lat)
                 if dep in par_dep:
                     par_dep[dep]["velos"] += 1
 
     if journal["ok"] == 0:
         raise ValueError(f"Aucun système VLS lisible ({journal['echecs']} échecs)")
-    return {"par_dep": par_dep, "carte": {"systemes": systemes, "stations": stations_carte},
+    return {"par_dep": par_dep, "par_commune": par_commune, "carte": {"systemes": systemes, "stations": stations_carte},
             "journal": journal}
