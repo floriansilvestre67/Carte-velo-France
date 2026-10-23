@@ -549,6 +549,9 @@
     return a >= 0.7 ? "forte" : a >= 0.4 ? "modérée" : a >= 0.2 ? "faible" : "très faible ou nulle";
   }
 
+  // Population minimale des communes de chaque onglet du nuage de points
+  var SEUILS_COMMUNES = { com: 10000, com100: 100000 };
+
   function pointsCorrelation(zone) {
     var nat = etat.nat, n = nbAnnees(), pts = [];
     if (etat.niveau === "dep") {
@@ -561,13 +564,13 @@
         pts.push({ nom: d.nom, acc: z ? somme(plage(z.acc)) / n : 0, pop: i.pop, km: i.km, sel: sel });
       });
     } else {
-      // Toujours toutes les communes de plus de 10 000 habitants de métropole ;
+      // Toujours toutes les communes de métropole au-dessus du seuil de l'onglet (10 000 ou 100 000 habitants) ;
       // celles de la zone choisie sont mises en avant (un département peut n'en compter qu'une).
-      var g = nat.grandes_communes || {};
+      var g = nat.grandes_communes || {}, seuil = SEUILS_COMMUNES[etat.niveau];
       var deps = zone.type === "R" ? zonesDe("D").filter(function (d) { return d.parent === zone.code; }).map(function (d) { return d.code; }) : null;
       Object.keys(g).forEach(function (c) {
         var v = g[c];
-        if (!v.p || v.km == null) return;
+        if (!v.p || v.km == null || v.p < seuil) return;
         var sel = zone.type === "ville" ? c === zone.code
           : zone.type === "D" ? v.d === zone.code.slice(1)
           : zone.type === "R" ? deps.indexOf(v.d) >= 0 : false;
@@ -702,11 +705,12 @@
   function majCorrelations(zone) {
     $("niv-dep").setAttribute("aria-selected", etat.niveau === "dep");
     $("niv-com").setAttribute("aria-selected", etat.niveau === "com");
+    $("niv-com100").setAttribute("aria-selected", etat.niveau === "com100");
     var pts = pointsCorrelation(zone);
     var n = nbAnnees();
     var aide = (etat.niveau === "dep" ? "Les " + pts.length + " départements métropolitains" +
       (zone.type === "FR" ? "" : ", ceux de la zone choisie en orange") + ". " :
-      "Les " + pts.length + " communes de plus de 10 000 habitants de métropole" +
+      "Les " + pts.length + " communes de plus de " + fmt0.format(SEUILS_COMMUNES[etat.niveau]) + " habitants de métropole" +
       (zone.type === "FR" ? "" : ", celles de la zone choisie en orange") + ". ") +
       "Accidents : moyenne par an sur " + (n > 1 ? n + " ans (" + etat.debut + "–" + etat.fin + ")" : etat.debut) +
       ". Population et km d'aménagements : valeurs actuelles.";
@@ -772,6 +776,7 @@
     });
     $("niv-dep").addEventListener("click", function () { etat.niveau = "dep"; majCorrelations(etat.zone); });
     $("niv-com").addEventListener("click", function () { etat.niveau = "com"; majCorrelations(etat.zone); });
+    $("niv-com100").addEventListener("click", function () { etat.niveau = "com100"; majCorrelations(etat.zone); });
     [1, 2, 3].forEach(function (k) {
       $("excl-" + k).addEventListener("change", function (e) { etat.exclure[k] = e.target.checked; majCorrelations(etat.zone); });
     });
