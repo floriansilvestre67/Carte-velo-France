@@ -357,29 +357,22 @@ def construire(client, sortie: Path, travail: Path, url_precedent: str | None = 
         traceback.print_exc()
         accs = None
 
-    # 5 bis. Cyclistes : actifs allant travailler à vélo (Insee, recensement)
+    # 5 bis. Cyclistes : actifs allant travailler à vélo (Insee, recensement 2017 et 2023)
     journal("   Actifs allant travailler à vélo (Insee)…")
     cyc = None
     try:
-        chemin = client.telecharger(cyclistes.URL_FICHIER, travail / "insee-emploi.zip")
+        chemin = client.telecharger(cyclistes.URL_FICHIER, travail / "insee-navettes.zip")
         cyc = cyclistes.lire(chemin, correspondance)
-        cyc["par_dep"] = cyclistes.par_departement(cyc["communes"], correspondance)
-        total = sum(v for d, v in cyc["par_dep"].items() if d in codes)
+        totaux = {an: sum((cyc["zones"].get("D" + d) or {}).get(str(an)) or 0 for d in codes) for an in cyc["annees"]}
         sources_meta["cyclistes"] = {
-            "statut": "ok", "url": cyclistes.URL_PAGE, "annee": cyc["annee"],
-            "detail": (f"Recensement {cyc['annee']} : {total:_} actifs vont travailler à vélo en métropole "
-                       f"({cyc['stats']['communes']:_} communes)").replace("_", " ")}
-        journal(f"  {cyc['stats']}, millésime {cyc['annee']}")
+            "statut": "ok", "url": cyclistes.URL_PAGE, "annees": cyc["annees"],
+            "detail": ("Actifs allant travailler à vélo en métropole : " +
+                       ", ".join(f"{totaux[an]:_} en {an}" for an in cyc["annees"]) +
+                       f" ({cyc['stats']['communes']:_} communes)").replace("_", " ")}
+        journal(f"  {cyc['stats']}, années {cyc['annees']}")
     except Exception as e:
         journal(f"  ✗ {e}")
         cyc = None
-    # Diagnostic provisoire : structure du millésime 2023 (nouveau format Insee), sans effet sur les données
-    # (écrit dans data/diag-insee.json, faute d'accès aux journaux de l'Action)
-    try:
-        diag = cyclistes.decrire_zip(client.telecharger(cyclistes.URL_DIAG_2023, travail / "insee-2023.zip"))
-    except Exception as e:
-        diag = [f"impossible : {e}"]
-    ecrire_json(sortie / "diag-insee.json", diag)
 
     # 6. Indicateurs
     journal("6/6 Indicateurs et score…")
@@ -556,7 +549,7 @@ def ecrire_accidents_et_communes(client, sortie, url_precedent, sources_meta, de
             for code_com, fiche in communes_dep.items():
                 if (ancien_vls.get(code_com) or {}).get("vls") is not None:
                     fiche["vls"] = ancien_vls[code_com]["vls"]
-        # Actifs allant travailler à vélo (Insee) : cyc = {"v": à vélo, "a": actifs occupés}
+        # Actifs allant travailler à vélo (Insee) : cyc = {"2017": [à vélo, actifs occupés], "2023": [...]}
         if cyc is not None:
             for code_com, fiche in communes_dep.items():
                 if code_com in cyc["communes"]:
@@ -564,8 +557,9 @@ def ecrire_accidents_et_communes(client, sortie, url_precedent, sources_meta, de
         else:
             ancien_cyc = (precedent_dep(dep).get("communes") or {})
             for code_com, fiche in communes_dep.items():
-                if (ancien_cyc.get(code_com) or {}).get("cyc") is not None:
-                    fiche["cyc"] = ancien_cyc[code_com]["cyc"]
+                ancienne = (ancien_cyc.get(code_com) or {}).get("cyc")
+                if cyclistes.format_valide(ancienne):
+                    fiche["cyc"] = ancienne
         if accs:
             lignes = [accidents.enregistrement(a, correspondance) for a in accs if a["dep"] == dep]
         else:
@@ -595,27 +589,40 @@ def ecrire_accidents_et_communes(client, sortie, url_precedent, sources_meta, de
             regions_vues.setdefault(par_code[c]["region"], {"nom": par_code[c]["region_nom"], "deps": []})["deps"].append(c)
     for r, v in regions_vues.items():
         infos["R" + r] = {"nom": v["nom"], "pop": somme(v["deps"], "population"), "km": somme(v["deps"], "km_total")}
-    # Cyclistes (Insee) par zone : somme des communes ; repris de la version en ligne si l'Insee est injoignable
+    national.pop("cyclistes_annee", None)                     # ancien format (un seul millésime)
+    # Cyclistes (Insee) par zone et par année : départements et régions tels que publiés par l'Insee,
+    # France métropolitaine = somme des départements ; repris de la version en ligne si l'Insee est injoignable
     if cyc is not None:
-        def somme_cyc(deps_zone):
-            vals = [cyc["par_dep"].get(c) for c in deps_zone]
+        def total(deps_zone, an):
+            vals = [(cyc["zones"].get("D" + c) or {}).get(an) for c in deps_zone]
             return None if any(v is None for v in vals) else sum(vals)
         for cle, info in infos.items():
-            deps_zone = codes if cle == "FR" else [cle[1:]] if cle[0] == "D" else regions_vues[cle[1:]]["deps"]
-            info["cyc"] = somme_cyc(deps_zone)
-        national["cyclistes_annee"] = cyc["annee"]
+            par_an = {}
+            for an in map(str, cyc["annees"]):
+                if cle == "FR":
+                    par_an[an] = total(codes, an)
+                elif cle[0] == "R":
+                    v = (cyc["zones"].get(cle) or {}).get(an)
+                    par_an[an] = v if v is not None else total(regions_vues[cle[1:]]["deps"], an)
+                else:
+                    par_an[an] = (cyc["zones"].get(cle) or {}).get(an)
+            info["cyc"] = par_an
+        national["cyclistes_annees"] = cyc["annees"]
     else:
         ancien = fichier_precedent(client, url_precedent, "accidents/national.json") or {}
-        for cle, info in infos.items():
-            info["cyc"] = ((ancien.get("zones_info") or {}).get(cle) or {}).get("cyc")
-        if ancien.get("cyclistes_annee"):
-            national["cyclistes_annee"] = ancien["cyclistes_annee"]
+        if ancien.get("cyclistes_annees"):
+            for cle, info in infos.items():
+                v = ((ancien.get("zones_info") or {}).get(cle) or {}).get("cyc")
+                info["cyc"] = v if cyclistes.format_valide(v) else None
+            national["cyclistes_annees"] = ancien["cyclistes_annees"]
             sources_meta["cyclistes"] = {"statut": "reprise", "url": cyclistes.URL_PAGE,
-                                         "annee": ancien["cyclistes_annee"],
+                                         "annees": ancien["cyclistes_annees"],
                                          "detail": "Source injoignable aujourd'hui : chiffres repris de la "
                                                    "mise à jour précédente."}
         else:
-            national.pop("cyclistes_annee", None)
+            for info in infos.values():
+                info["cyc"] = None
+            national.pop("cyclistes_annees", None)
             sources_meta["cyclistes"] = {"statut": "indisponible", "detail": "Source injoignable."}
     national["zones_info"] = infos
 

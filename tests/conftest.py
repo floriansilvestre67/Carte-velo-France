@@ -341,25 +341,47 @@ def jeu_datagouv():
 
 
 def insee_fictif(d: Path, urls: dict) -> None:
-    """Base Insee « Caractéristiques de l'emploi » : CSV « ; » dans un zip, avec un fichier de
-    métadonnées à ignorer, des valeurs décimales (exploitation pondérée) et les arrondissements."""
-    entete = ["CODGEO", "LIBGEO", "P21_EMPLT", "P21_ACTOCC15P", "P21_ACTOCC15P_VOIT", "P21_ACTOCC15P_VELO"]
+    """Base Insee « Navettes » au format Melodi (une ligne par territoire, mode et année), avec son
+    fichier de métadonnées. Cas réels reproduits : 2012 avec vélo et deux-roues confondus (3T4),
+    arrondissements (ARM) à ignorer, autres zonages, valeur « K » (comptée ailleurs), décimales."""
+    entete = "GEO;GEO_OBJECT;TRANS;AGE;EMPSTA_ENQ;WORK_AREA;RP_MEASURE;FREQ;OBS_STATUS;TIME_PERIOD;OBS_VALUE"
     lignes = [entete]
+
+    def l(geo, objet, trans, an, valeur, statut="A", zone="_T"):
+        lignes.append(f"{geo};{objet};{trans};Y_GE15;1;{zone};POP;A;{statut};{an};{valeur}")
+
     for code in CODES:
         for k in range(1, 13):
-            lignes.append([f"{code}{k:03d}", f"Commune {code}-{k}", "500", "400,5", "300", f"{k}.4"])
-    # Paris : commune entière ET arrondissements (ne pas compter deux fois)
-    lignes.append(["75056", "Paris", "1000000", "1000000", "100000", "70000.2"])
-    lignes.append(["75101", "Paris 1er", "50000", "10000", "1000", "900"])
-    # Lyon : seulement les arrondissements (à additionner)
-    lignes.append(["69381", "Lyon 1er", "20000", "15000", "2000", "1500.5"])
-    lignes.append(["69382", "Lyon 2e", "20000", "15000", "2000", "1499.5"])
-    lignes.append(["97411", "Saint-Denis", "1", "1", "1", "1"])          # hors métropole
-    lignes.append(["00000", "Inconnue", "1", "1", "1", "1"])              # code inconnu
+            com = f"{code}{k:03d}"
+            l(com, "COM", "3T4", 2012, "99")                 # année sans vélo distingué : ignorée
+            l(com, "COM", "3", 2017, f"{k}.4")
+            l(com, "COM", "3", 2023, f"{2 * k}.4")
+            l(com, "COM", "4", 2023, "50")                   # deux-roues motorisés : ignorés
+            l(com, "COM", "_T", 2017, "400.5")
+            l(com, "COM", "_T", 2023, "410")
+            l(com, "COM", "_T", 2023, "77", zone="21")       # ventilation par lieu de travail : ignorée
+            l(com, "BV2022", "3", 2023, "999")               # autre zonage : ignoré
+        l(code, "DEP", "3", 2017, str(sum(k + 0.4 for k in range(1, 13))))
+        l(code, "DEP", "3", 2023, str(sum(2 * k + 0.4 for k in range(1, 13))))
+    l("84", "REG", "3", 2017, "1234")
+    l("84", "REG", "3", 2023, "2345")
+    l("75056", "COM", "3", 2017, "50000")
+    l("75056", "COM", "3", 2023, "90000")
+    l("75056", "COM", "_T", 2023, "1000000")
+    l("75101", "ARM", "3", 2023, "900")                      # arrondissement : ignoré
+    l("69123", "COM", "3", 2017, "18000")
+    l("69123", "COM", "3", 2023, "0", statut="K")            # valeur comptée ailleurs : inconnue
+    l("00000", "COM", "3", 2023, "5")                        # code inconnu
+    meta = ["COD_VAR;LIB_VAR;COD_MOD;LIB_MOD;GEO_OBJECT",
+            "TRANS;Mode de transport;1;Pas de transport;",
+            "TRANS;Mode de transport;3T4;Vélo ou deux-roues motorisé;",
+            "TRANS;Mode de transport;4;Deux-roues motorisé;",
+            "TRANS;Mode de transport;3;Vélo (y compris à assistance électrique);",
+            "TRANS;Mode de transport;_T;Total;"]
     chemin = d / "insee.zip"
     with zipfile.ZipFile(chemin, "w") as z:
-        z.writestr("base-cc-caract_emp-2021.CSV", "\n".join(";".join(l) for l in lignes))
-        z.writestr("meta_base-cc-caract_emp-2021.CSV", "COD_VAR;LIB_VAR\nP21_ACTOCC15P_VELO;Actifs à vélo")
+        z.writestr("DS_RP_NAVETTES_PRINC_2023_data.csv", "\n".join(lignes))
+        z.writestr("DS_RP_NAVETTES_PRINC_2023_metadata.csv", "\n".join(meta))
     urls[cyclistes.URL_FICHIER] = chemin
 
 

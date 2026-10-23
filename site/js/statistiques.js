@@ -428,64 +428,113 @@
 
   // ---------------------------------------------------------------- ratios (tableau classable)
 
-  // cyc : actifs allant travailler à vélo (Insee) ; absent = indisponible, jamais remplacé par 0
-  function ligneRatio(code, nom, accPeriode, pop, km, selection, cyc) {
-    var n = nbAnnees(), parAn = accPeriode / n;
+  // ---- Cyclistes (Insee) ----
+  // cyc = {"2017": n, "2023": n} pour une zone, {"2017": [n, actifs], ...} pour une commune.
+  // Chaque année d'accidents est rapportée au recensement le plus proche (à égalité, le plus récent) ;
+  // seules les années à partir du premier recensement où le vélo est distingué (2017) sont prises.
+  function nbCyclistes(cyc, an) {
+    var v = cyc ? cyc[String(an)] : null;
+    if (Array.isArray(v)) v = v[0];
+    return v == null ? null : v;
+  }
+
+  function recensementPour(an) {
+    var r = etat.nat.cyclistes_annees || [], best = null;
+    r.forEach(function (c) { if (best === null || Math.abs(an - c) <= Math.abs(an - best)) best = c; });
+    return best;
+  }
+
+  // Années d'accidents retenues pour la colonne : la période choisie, à partir de 2017
+  function periodeCyclistes() {
+    var r = etat.nat.cyclistes_annees;
+    if (!r || !r.length) return null;
+    var debut = Math.max(etat.debut, r[0]);
+    return debut > etat.fin ? null : { debut: debut, fin: etat.fin };
+  }
+
+  // Taux annuel moyen d'accidents pour 1 000 cyclistes, et nombre d'accidents utilisés
+  function tauxCyclistes(accAn, cyc) {
+    var p = periodeCyclistes();
+    if (!p || !cyc) return { taux: null, acc: 0, raison: p ? "indisponible" : "hors période" };
+    var total = 0, acc = 0, n = 0;
+    for (var an = p.debut; an <= p.fin; an++) {
+      var c = nbCyclistes(cyc, recensementPour(an));
+      if (c == null) return { taux: null, acc: 0, raison: "indisponible" };
+      if (c === 0) return { taux: null, acc: 0, raison: "aucun cycliste recensé" };
+      var a = accAn(an);
+      total += a / c; acc += a; n++;
+    }
+    return { taux: total / n * 1000, acc: acc, raison: null };
+  }
+
+  // accAn(an) : nombre d'accidents de l'année an pour cette ligne
+  function ligneRatio(code, nom, accPeriode, pop, km, selection, cyc, accAn) {
+    var n = nbAnnees(), parAn = accPeriode / n, tc = tauxCyclistes(accAn, cyc);
+    var r = etat.nat.cyclistes_annees || [];
     return { code: code, nom: nom, acc: accPeriode, paran: parAn,
              parhab: pop ? parAn / pop * 1e5 : null, parkm: km ? parAn / km * 100 : null,
-             parcyc: cyc ? parAn / cyc * 1000 : null,
-             km: km, pop: pop, cyc: cyc == null ? null : cyc, selection: !!selection };
+             parcyc: tc.taux, accCyc: tc.acc, raisonCyc: tc.raison,
+             km: km, pop: pop, cyc: r.length ? nbCyclistes(cyc, r[r.length - 1]) : null, selection: !!selection };
   }
 
   // Texte d'avertissement sur la colonne « pour 1 000 cyclistes »
   function aideCyclistes() {
-    var an = etat.nat.cyclistes_annee;
-    if (!an) return " Nombre de cyclistes indisponible lors de la dernière mise à jour.";
-    var t = " Cyclistes : actifs qui vont travailler principalement à vélo, d'après le recensement Insee " + an +
-      ". C'est une donnée sur une courte période : le vélo n'est compté à part que depuis 2015, et un seul millésime est utilisé ici," +
-      " quelle que soit la période choisie. Les autres déplacements (études, loisirs, retraités) ne sont pas comptés.";
-    if (etat.debut < 2017) {
-      t += " Attention : la période choisie commence en " + etat.debut +
-        ", bien avant ce recensement ; le rapport aux cyclistes n'est alors qu'un ordre de grandeur. Choisissez une période à partir de 2017 pour une comparaison plus juste.";
-    }
+    var r = etat.nat.cyclistes_annees;
+    if (!r || !r.length) return " Nombre de cyclistes indisponible lors de la dernière mise à jour.";
+    var t = " Cyclistes : actifs qui vont travailler principalement à vélo, d'après les recensements Insee " + r.join(" et ") +
+      ". C'est une donnée sur une courte période : le recensement ne distingue le vélo des deux-roues motorisés que depuis 2015." +
+      " Seuls les accidents à partir de " + r[0] + " sont donc pris en compte dans cette colonne, chaque année étant rapportée au recensement le plus proche" +
+      (r.length > 1 ? " (" + r[0] + " pour " + r[0] + "–" + (Math.ceil((r[0] + r[1]) / 2) - 1) + ", " + r[1] + " ensuite)" : "") +
+      ". Les autres déplacements (études, loisirs, retraités) ne sont pas comptés.";
+    var p = periodeCyclistes();
+    if (!p) t += " La période choisie se termine avant " + r[0] + " : ce rapport ne peut pas être calculé.";
+    else if (etat.debut < p.debut) t += " Pour la période choisie, la colonne porte donc sur " + p.debut + "–" + p.fin + ".";
     return t;
   }
 
   function majRatios(zone) {
     var nat = etat.nat, n = nbAnnees(), lignes = [], promesse = Promise.resolve();
     var accZone = function (code) { var z = nat.zones[code]; return z ? somme(plage(z.acc)) : 0; };
+    var accZoneAn = function (code) {
+      return function (an) { var z = nat.zones[code], i = etat.annees.indexOf(an); return z && i >= 0 ? z.acc[i] : 0; };
+    };
     var aide = "Moyennes annuelles sur la période. La population et les km d'aménagements sont les valeurs actuelles. ";
     if (zone.type === "FR" || zone.type === "R") {
       zonesDe("D").filter(function (d) { return zone.type === "FR" || d.parent === zone.code; }).forEach(function (d) {
         var i = nat.zones_info["D" + d.code];
-        lignes.push(ligneRatio(d.code, d.nom, accZone("D" + d.code), i.pop, i.km, false, i.cyc));
+        lignes.push(ligneRatio(d.code, d.nom, accZone("D" + d.code), i.pop, i.km, false, i.cyc, accZoneAn("D" + d.code)));
       });
       aide += "Une ligne par département.";
     } else {
       var dep = zone.type === "D" ? zone.code.slice(1) : depDeCommune(zone.code);
       promesse = fichierDep(dep).then(function (f) {
-        var champs = f.accidents.champs, ia = champs.indexOf("an"), ic = champs.indexOf("com"), par = {};
+        var champs = f.accidents.champs, ia = champs.indexOf("an"), ic = champs.indexOf("com"), par = {}, parAn = {};
         f.accidents.lignes.forEach(function (l) {
-          if (l[ia] >= etat.debut && l[ia] <= etat.fin && l[ic]) par[l[ic]] = (par[l[ic]] || 0) + 1;
+          var c = l[ic];
+          if (!c) return;
+          parAn[c] = parAn[c] || {};
+          parAn[c][l[ia]] = (parAn[c][l[ia]] || 0) + 1;
+          if (l[ia] >= etat.debut && l[ia] <= etat.fin) par[c] = (par[c] || 0) + 1;
         });
+        var accComAn = function (c) { return function (an) { return (parAn[c] || {})[an] || 0; }; };
         Object.keys(par).forEach(function (c) {
           var info = f.communes[c] || {};
-          lignes.push(ligneRatio(c, info.n || c, par[c], info.p, (info.km || {}).t, c === etat.ville, (info.cyc || {}).v));
+          lignes.push(ligneRatio(c, info.n || c, par[c], info.p, (info.km || {}).t, c === etat.ville, info.cyc, accComAn(c)));
         });
         if (zone.type === "ville" && !par[etat.ville]) {
           var info = f.communes[etat.ville] || {};
-          lignes.push(ligneRatio(etat.ville, info.n || etat.ville, 0, info.p, (info.km || {}).t, true, (info.cyc || {}).v));
+          lignes.push(ligneRatio(etat.ville, info.n || etat.ville, 0, info.p, (info.km || {}).t, true, info.cyc, accComAn(etat.ville)));
         }
       });
       aide += "Une ligne par commune ayant au moins un accident sur la période, avec le total du département pour comparaison.";
       promesse = promesse.then(function () {
         var i = nat.zones_info["D" + dep];
-        lignes.push(ligneRatio("D" + dep, "Département : " + i.nom, accZone("D" + dep), i.pop, i.km, zone.type === "D", i.cyc));
+        lignes.push(ligneRatio("D" + dep, "Département : " + i.nom, accZone("D" + dep), i.pop, i.km, zone.type === "D", i.cyc, accZoneAn("D" + dep)));
       });
     }
     return promesse.then(function () {
       var fr = nat.zones_info.FR;
-      lignes.push(ligneRatio("FR", "France métropolitaine", accZone("FR"), fr.pop, fr.km, zone.type === "FR", fr.cyc));
+      lignes.push(ligneRatio("FR", "France métropolitaine", accZone("FR"), fr.pop, fr.km, zone.type === "FR", fr.cyc, accZoneAn("FR")));
       $("aide-ratios").textContent = aide + " Les valeurs suivies de « * » reposent sur moins de 10 accidents." + aideCyclistes();
       etat.lignesRatios = lignes;
       dessinerRatios();
@@ -498,10 +547,16 @@
     { cle: "paran", titre: "Accidents par an", f: fmt1 },
     { cle: "parhab", titre: "Pour 100 000 hab. par an", f: fmt1 },
     { cle: "parkm", titre: "Pour 100 km d'aménagements par an", f: fmt2 },
-    { cle: "parcyc", titre: "Pour 1 000 cyclistes (trajets domicile-travail) par an", f: fmt1 },
+    { cle: "parcyc", titre: function () {
+        var p = periodeCyclistes();
+        return "Pour 1 000 cyclistes (trajets domicile-travail) par an" + (p ? ", " + (p.debut === p.fin ? p.debut : p.debut + "–" + p.fin) : "");
+      }, f: fmt1 },
     { cle: "km", titre: "Km d'aménagements" },
     { cle: "pop", titre: "Population" },
-    { cle: "cyc", titre: "Actifs allant travailler à vélo" }
+    { cle: "cyc", titre: function () {
+        var r = etat.nat.cyclistes_annees || [];
+        return "Actifs allant travailler à vélo" + (r.length ? " (" + r[r.length - 1] + ")" : "");
+      } }
   ];
 
   function dessinerRatios() {
@@ -517,16 +572,19 @@
     });
     var html = "<thead><tr>" + COLONNES.map(function (c) {
       var tri = t.cle === c.cle ? (t.sens < 0 ? "descending" : "ascending") : "none";
-      return '<th scope="col" aria-sort="' + tri + '"><button type="button" data-cle="' + c.cle + '">' + c.titre + "</button></th>";
+      var titre = typeof c.titre === "function" ? c.titre() : c.titre;
+      return '<th scope="col" aria-sort="' + tri + '"><button type="button" data-cle="' + c.cle + '">' + echapper(titre) + "</button></th>";
     }).join("") + "</tr></thead><tbody>";
     autres.concat(fixes).forEach(function (l) {
       var peu = l.acc < 10;
       html += '<tr class="' + (l.selection ? "selection" : "") + '">' + COLONNES.map(function (c, i) {
         var v = l[c.cle];
         if (i === 0) return '<th scope="row">' + echapper(v) + "</th>";
-        var txt = v == null ? (c.cle === "parcyc" && l.cyc === 0 ? "non calculable" : "indisponible") : (c.f || fmt0).format(v);
-        if (peu && (c.cle === "paran" || c.cle === "parhab" || c.cle === "parkm" || c.cle === "parcyc") && v != null) txt += "*";
-        return '<td class="' + (peu ? "peu" : "") + '">' + txt + "</td>";
+        var txt = v == null ? (c.cle === "parcyc" && l.raisonCyc !== "indisponible" ? "non calculable" : "indisponible") : (c.f || fmt0).format(v);
+        // Pour cette colonne, le seuil de 10 accidents porte sur les seules années retenues (2017 et après)
+        var peuIci = c.cle === "parcyc" ? l.accCyc < 10 : peu;
+        if (peuIci && (c.cle === "paran" || c.cle === "parhab" || c.cle === "parkm" || c.cle === "parcyc") && v != null) txt += "*";
+        return '<td class="' + (peuIci ? "peu" : "") + '">' + txt + "</td>";
       }).join("") + "</tr>";
     });
     $("t-ratios-table").innerHTML = html + "</tbody>";
