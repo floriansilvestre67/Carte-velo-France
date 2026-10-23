@@ -23,16 +23,30 @@
   </header>
   <main class="page-texte">
     <h1>Sources et méthode</h1>
-    <p>Tous les chiffres de la carte sont calculés automatiquement chaque jour à partir de données ouvertes. Quand une donnée manque, elle est affichée comme indisponible : rien n'est estimé ni inventé.</p>
+    <p>Tous les chiffres du site sont calculés automatiquement chaque jour à partir de données ouvertes. Quand une donnée manque, elle est affichée comme indisponible : rien n'est estimé ni inventé.</p>
+    <nav class="sommaire" aria-label="Sommaire de la page">
+      <p>Sur cette page :</p>
+      <ul>
+        <li><a href="#etat">État des données</a></li>
+        <li><a href="#sources">Sources</a></li>
+        <li><a href="#indicateurs">Calcul des indicateurs</a></li>
+        <li><a href="#score">Le score vélo</a></li>
+        <li><a href="#ville">Fiche Ville</a></li>
+        <li><a href="#stationnement">Stationnement vélo</a></li>
+        <li><a href="#lieux">Lieux à visiter</a></li>
+        <li><a href="#accidents">Accidents de vélo</a></li>
+        <li><a href="#limites">Limites</a></li>
+      </ul>
+    </nav>
 
-    <h2>État des données</h2>
+    <h2 id="etat">État des données</h2>
     <p id="genere">Chargement…</p>
     <table>
       <thead><tr><th scope="col">Source</th><th scope="col">État</th><th scope="col">Détail</th></tr></thead>
       <tbody id="etat-sources"></tbody>
     </table>
 
-    <h2>Sources</h2>
+    <h2 id="sources">Sources</h2>
     <h3>Aménagements cyclables</h3>
     <p>Jeu national <a href="https://www.data.gouv.fr/fr/datasets/amenagements-cyclables-france-metropolitaine/">« Aménagements cyclables France métropolitaine »</a> publié sur data.gouv.fr par Geovelo, au format du schéma national des aménagements cyclables. Les données sont issues d'OpenStreetMap, sous licence ODbL (© contributeurs OpenStreetMap).</p>
 
@@ -45,13 +59,16 @@
     <h3>Régions</h3>
     <p>La région de chaque département vient de la même <a href="https://geo.api.gouv.fr/">API Découpage administratif</a>. Les totaux d'une région sont la somme de ceux de ses départements ; si l'un d'eux manque une donnée, le total régional est affiché comme indisponible.</p>
 
+    <h3>Communes</h3>
+    <p>La liste des communes, leurs codes postaux, les arrondissements de Paris, Lyon et Marseille et les anciennes communes fusionnées viennent de l'<a href="https://geo.api.gouv.fr/">API Découpage administratif</a> (Licence Ouverte). Les contours des communes sont ceux publiés par Etalab (<a href="https://etalab-datasets.geo.data.gouv.fr/contours-administratifs/latest/geojson/">contours administratifs</a>, simplifiés à 100 m, Licence Ouverte).</p>
+
     <h3>Contours des départements</h3>
     <p>Version simplifiée du dépôt <a href="https://github.com/gregoiredavid/france-geojson">gregoiredavid/france-geojson</a>. Les conditions de réutilisation sont indiquées dans le dépôt.</p>
 
     <h3>Fonds de carte</h3>
     <p>Fond de carte et calque des pistes <a href="https://www.cyclosm.org">CyclOSM</a> : données © <a href="https://www.openstreetmap.org/copyright">contributeurs OpenStreetMap</a>.</p>
 
-    <h2>Calcul des indicateurs</h2>
+    <h2 id="indicateurs">Calcul des indicateurs</h2>
     <h3>Kilomètres d'aménagements</h3>
     <p>Chaque tronçon de la base décrit les deux côtés de la voie. Chaque côté aménagé compte pour la longueur du tronçon : une rue avec une bande cyclable de chaque côté compte donc deux fois sa longueur. Une voie verte décrite à l'identique des deux côtés n'est comptée qu'une fois, car c'est une seule voie. La longueur est mesurée sur l'ellipsoïde terrestre (calcul géodésique) à partir du tracé.</p>
     <p>Chaque côté est rattaché au département de sa commune (code INSEE). Si le code manque, on utilise la position du tronçon.</p>
@@ -78,8 +95,9 @@
 
     <h3>Vélos en libre-service</h3>
     <p>Une station est rattachée au département où elle se trouve. Le nombre de vélos est un instantané : ce sont les vélos disponibles au moment de la mise à jour quotidienne, en station et en libre (free-floating). Il varie donc d'un jour à l'autre. Un système dont le flux est en panne ce jour-là n'est pas compté.</p>
+    <p>Certains services en free-floating (Dott, Lime, Voi…) publient leurs zones de stationnement comme des stations. Dans la fiche d'une ville, elles sont comptées à part (« zones de stationnement en free-floating »), grâce à l'indication « station virtuelle » des flux. Les chiffres par département et le score vélo les comptent encore comme des stations.</p>
 
-    <h2>Le score vélo</h2>
+    <h2 id="score">Le score vélo</h2>
     <p>Le score vélo, sur 100, résume six indicateurs :</p>
     <ul>
       <li>km d'aménagements cyclables ;</li>
@@ -92,6 +110,15 @@
     <p>Pour chaque indicateur, les départements sont classés et reçoivent un rang centile : 100 pour le premier, 0 pour le dernier, les autres régulièrement entre les deux. Les ex æquo reçoivent la moyenne de leurs rangs. Le score est la moyenne de ces six rangs centiles.</p>
     <p>Exemple : un département premier sur trois indicateurs (100), et au milieu du classement sur les trois autres (50), obtient (3 × 100 + 3 × 50) ÷ 6 = 75.</p>
     <p>Le score mesure une position relative entre départements, pas une qualité absolue. Il mélange volontairement des totaux, qui favorisent les grands départements, et des chiffres rapportés à la population ou à la surface, qui favorisent les départements urbains. Si une source est indisponible, le score est calculé sur les indicateurs restants et la fiche du département le signale.</p>
+
+    <h2 id="ville">Fiche Ville</h2>
+    <p>Une ville est une commune, repérée par son code INSEE. Paris, Lyon et Marseille sont traités comme une seule commune ; leurs arrondissements restent consultables dans la recherche et sur la page Statistiques.</p>
+    <ul>
+      <li><strong>Kilomètres d'aménagements</strong> : chaque côté aménagé d'un tronçon est attribué à la commune indiquée pour ce côté dans la base nationale (une ancienne commune fusionnée est rattachée à sa commune actuelle). Les rares côtés sans code commune ne comptent qu'au niveau du département.</li>
+      <li><strong>Vélos en libre-service, stationnement et lieux</strong> : rattachés à la commune qui contient leur position.</li>
+      <li><strong>Rang dans le département</strong> : calculé parmi les communes de plus de 2 000 habitants, pour éviter que les très petites communes ne faussent les chiffres rapportés à la population.</li>
+      <li><strong>Accidents</strong> : nombre par année, et ratios de l'année choisie. Un ratio calculé sur moins de 10 accidents est signalé comme peu significatif.</li>
+    </ul>
 
     <h2 id="stationnement">Stationnement vélo</h2>
     <h3>Sources</h3>
@@ -138,15 +165,18 @@
     <h3>Rapports et corrélations</h3>
     <p>Les accidents sont rapportés à la population (pour 100 000 habitants) et aux kilomètres d'aménagements cyclables (pour 100 km), en moyenne par an sur la période choisie. La population et les kilomètres sont les valeurs actuelles, même pour les années anciennes. Les corrélations utilisent les coefficients de Pearson (relation linéaire) et de Spearman (relation de rang, moins sensible aux valeurs extrêmes comme Paris). Elles ne prouvent aucun lien de cause à effet : plus de cyclistes entraîne à la fois plus d'aménagements et plus d'accidents.</p>
 
-    <h2>Limites</h2>
+    <h2 id="limites">Limites</h2>
     <ul>
       <li>La base des aménagements dépend de la complétude d'OpenStreetMap, inégale selon les territoires.</li>
       <li>Les systèmes de vélos en libre-service qui ne publient pas de flux GBFS ne sont pas comptés.</li>
+      <li>Au niveau des départements, les zones de stationnement des services en free-floating sont encore comptées comme des stations de vélos en libre-service.</li>
+      <li>La source des accidents est très incomplète en 2018 et en 2023 dans certains territoires, et s'arrête en 2023 (voir <a href="#accidents">Accidents de vélo</a>).</li>
+      <li>Les emplacements de stationnement et une partie des lieux dépendent eux aussi des contributions à OpenStreetMap et aux offices de tourisme, inégales selon les territoires.</li>
       <li>Seule la France métropolitaine est couverte pour l'instant.</li>
     </ul>
 
     <h2>Mise à jour</h2>
-    <p>Les données sont recalculées chaque jour et à chaque modification du site, par un script exécuté sur GitHub Actions. Si une source est injoignable, les chiffres de la veille sont conservés et signalés dans le tableau ci-dessus. Le <a href="https://github.com/floriansilvestre67/Carte-velo-France">code source</a> est public.</p>
+    <p>Les données sont recalculées chaque jour et à chaque modification du site, par un script exécuté sur GitHub Actions. Les lieux à visiter, dont les sources pèsent plus de 400 Mo, sont recalculés une fois par semaine. Si une source est injoignable, les chiffres de la veille sont conservés et signalés dans le tableau ci-dessus. Le <a href="https://github.com/floriansilvestre67/Carte-velo-France">code source</a> est public.</p>
   </main>
   <script src="js/methode.js"></script>
 </body>

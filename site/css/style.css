@@ -269,6 +269,10 @@ input[type="search"] {
 .statut.reprise { color: #9a6200; }
 .statut.indisponible { color: #a3261b; }
 .retour { display: inline-block; margin-bottom: 8px; }
+.sommaire { border-left: 3px solid var(--vert); padding: 4px 0 4px 16px; margin: 16px 0 8px; }
+.sommaire p { margin: 0 0 4px; font-weight: 700; }
+.sommaire ul { margin: 0; padding-left: 18px; columns: 2; column-gap: 32px; }
+@media (max-width: 640px) { .sommaire ul { columns: 1; } }
 
 /* ---------- Mobile : carte en haut, panneau en dessous ---------- */
 
