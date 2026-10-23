@@ -118,12 +118,13 @@ def par_departement(communes: dict, correspondance) -> dict[str, int]:
     return total
 
 
-def decrire_zip(chemin_zip: Path, journal, max_lignes: int = 300_000) -> None:
+def decrire_zip(chemin_zip: Path) -> list[str]:
     """Décrit la structure d'un fichier Insee au format Melodi (en-têtes, valeurs des colonnes
-    de dimension), pour préparer sa lecture. Ne produit aucune donnée publiée."""
+    de dimension, lignes d'exemple pour Lyon), pour préparer sa lecture. Diagnostic provisoire."""
+    sortie = []
     with zipfile.ZipFile(chemin_zip) as z:
         for info in z.infolist():
-            journal(f"  [diag Insee] {info.filename} ({info.file_size / 1e6:.1f} Mo)")
+            sortie.append(f"{info.filename} ({info.file_size / 1e6:.1f} Mo)")
             if not info.filename.lower().endswith(".csv"):
                 continue
             with z.open(info) as f:
@@ -131,19 +132,23 @@ def decrire_zip(chemin_zip: Path, journal, max_lignes: int = 300_000) -> None:
                 entete = texte.readline()
                 sep = max(";,\t", key=entete.count)
                 champs = next(csv.reader([entete], delimiter=sep))
-                journal(f"  [diag Insee]   colonnes : {champs}")
+                sortie.append(f"  séparateur {sep!r}, colonnes : {champs}")
+                petit = info.file_size < 2_000_000            # fichier de métadonnées : on le recopie
                 valeurs = {c: {} for c in champs}
+                exemples = 0
                 for i, ligne in enumerate(csv.reader(texte, delimiter=sep)):
-                    if i < 3:
-                        journal(f"  [diag Insee]   exemple : {ligne}")
-                    if i >= max_lignes:
-                        break
+                    if i < 5 or (petit and i < 400):
+                        sortie.append(f"  ligne : {ligne}")
+                    elif exemples < 80 and any("69123" in v for v in ligne):
+                        sortie.append(f"  Lyon : {ligne}")
+                        exemples += 1
                     for c, v in zip(champs, ligne):
                         d = valeurs[c]
-                        if len(d) <= 60:
+                        if len(d) <= 80 or v in d:
                             d[v] = d.get(v, 0) + 1
                 for c, d in valeurs.items():
-                    if len(d) <= 60:
-                        journal(f"  [diag Insee]   {c} : {sorted(d.items())[:60]}")
+                    if len(d) <= 80:
+                        sortie.append(f"  {c} : {sorted(d.items())}")
                     else:
-                        journal(f"  [diag Insee]   {c} : plus de 60 valeurs")
+                        sortie.append(f"  {c} : plus de 80 valeurs, par ex. {list(d)[:10]}")
+    return sortie

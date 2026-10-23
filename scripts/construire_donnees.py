@@ -374,10 +374,12 @@ def construire(client, sortie: Path, travail: Path, url_precedent: str | None = 
         journal(f"  ✗ {e}")
         cyc = None
     # Diagnostic provisoire : structure du millésime 2023 (nouveau format Insee), sans effet sur les données
+    # (écrit dans data/diag-insee.json, faute d'accès aux journaux de l'Action)
     try:
-        cyclistes.decrire_zip(client.telecharger(cyclistes.URL_DIAG_2023, travail / "insee-2023.zip"), journal)
+        diag = cyclistes.decrire_zip(client.telecharger(cyclistes.URL_DIAG_2023, travail / "insee-2023.zip"))
     except Exception as e:
-        journal(f"  [diag Insee] impossible : {e}")
+        diag = [f"impossible : {e}"]
+    ecrire_json(sortie / "diag-insee.json", diag)
 
     # 6. Indicateurs
     journal("6/6 Indicateurs et score…")
