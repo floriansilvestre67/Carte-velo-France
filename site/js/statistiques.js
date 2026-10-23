@@ -637,7 +637,9 @@
         var sel = zone.type === "R" ? d.parent === zone.code : zone.type === "D" ? "D" + d.code === zone.code
           : zone.type === "ville" ? d.code === depDeCommune(zone.code) : false;
         // Pas de zone dans le fichier = aucun accident recensé
-        pts.push({ nom: d.nom, acc: z ? somme(plage(z.acc)) / n : 0, pop: i.pop, km: i.km, sel: sel });
+        var accAn = function (an) { var k = etat.annees.indexOf(an); return z && k >= 0 ? z.acc[k] : 0; };
+        pts.push({ nom: d.nom, acc: z ? somme(plage(z.acc)) / n : 0, pop: i.pop, km: i.km, sel: sel,
+                   tc: tauxCyclistes(accAn, i.cyc).taux });
       });
     } else {
       // Toujours toutes les communes de métropole au-dessus du seuil de l'onglet (10 000 ou 100 000 habitants) ;
@@ -650,7 +652,9 @@
         var sel = zone.type === "ville" ? c === zone.code
           : zone.type === "D" ? v.d === zone.code.slice(1)
           : zone.type === "R" ? deps.indexOf(v.d) >= 0 : false;
-        pts.push({ nom: v.n, acc: somme(plage(v.acc)) / n, pop: v.p, km: v.km, sel: sel });
+        var accAn = function (an) { var k = etat.annees.indexOf(an); return k >= 0 ? v.acc[k] || 0 : 0; };
+        pts.push({ nom: v.n, acc: somme(plage(v.acc)) / n, pop: v.p, km: v.km, sel: sel,
+                   tc: tauxCyclistes(accAn, v.cy).taux });
       });
     }
     return pts;
@@ -716,7 +720,10 @@
   };
 
   // num : 1, 2 ou 3 (numéro du nuage, sert aux identifiants g-cN, coef-N, excl-N)
-  function nuage(num, pts, fx, fy, titreX, titreY) {
+  // Les points sans valeur (ex. nombre de cyclistes indisponible) sont écartés du nuage et signalés.
+  function nuage(num, tousPts, fx, fy, titreX, titreY, motifManque) {
+    var pts = tousPts.filter(function (p) { var a = fx(p), b = fy(p); return a != null && b != null && isFinite(a) && isFinite(b); });
+    var manquants = tousPts.length - pts.length;
     var x = pts.map(fx), y = pts.map(fy);
     var cook = distancesCook(x, y) || [];
     var extreme = pts.map(function (p, i) { return cook[i] > SEUIL_COOK; });
@@ -774,8 +781,9 @@
           "r = " + fmt2.format(autre.rp) + ", ρ = " + fmt2.format(autre.rs) + ".";
       }
     }
+    if (manquants) txt += " " + manquants + (manquants > 1 ? " zones écartées" : " zone écartée") + " : " + (motifManque || "donnée indisponible") + ".";
     $("coef-" + num).textContent = txt;
-    return extreme;
+    return tousPts.map(function (p) { var i = pts.indexOf(p); return i >= 0 && extreme[i]; });
   }
 
   function majCorrelations(zone) {
@@ -801,15 +809,21 @@
         "Km d'aménagements cyclables", "Accidents par an");
       ext[1] = nuage(2, pts, function (p) { return p.pop; }, function (p) { return p.acc; },
         "Habitants", "Accidents par an");
-      ext[2] = nuage(3, pts, function (p) { return p.km / p.pop * 1e4; }, function (p) { return p.acc / p.pop * 1e5; },
-        "Km pour 10 000 habitants", "Accidents pour 100 000 hab. par an");
+      var pc = periodeCyclistes();
+      ext[2] = nuage(3, pts, function (p) { return p.km / p.pop * 1e4; }, function (p) { return p.tc; },
+        "Km pour 10 000 habitants",
+        "Accidents pour 1 000 cyclistes par an" + (pc ? " (" + (pc.debut === pc.fin ? pc.debut : pc.debut + "–" + pc.fin) + ")" : ""),
+        pc ? "nombre de cyclistes indisponible ou nul" : "la période choisie se termine avant " + ((etat.nat.cyclistes_annees || [2017])[0]));
+      $("cap-c3").textContent = "Accidents pour 1 000 cyclistes (trajets domicile-travail" +
+        (pc ? ", " + (pc.debut === pc.fin ? pc.debut : pc.debut + "–" + pc.fin) : "") + ") et km pour 10 000 hab.";
     }
     $("d-correl").innerHTML = tableHTML(
       ["Zone", "Accidents par an", "Population", "Km d'aménagements", "Km pour 10 000 hab.", "Accidents pour 100 000 hab. par an",
-       "Valeur extrême sur le graphique"],
+       "Accidents pour 1 000 cyclistes par an (depuis 2017)", "Valeur extrême sur le graphique"],
       pts.map(function (p, i) {
         var sur = [1, 2, 3].filter(function (k) { return ext[k - 1][i]; }).join(", ");
-        return [p.nom, fmt1.format(p.acc), p.pop, p.km, fmt1.format(p.km / p.pop * 1e4), fmt1.format(p.acc / p.pop * 1e5), sur || "–"];
+        return [p.nom, fmt1.format(p.acc), p.pop, p.km, fmt1.format(p.km / p.pop * 1e4), fmt1.format(p.acc / p.pop * 1e5),
+                p.tc == null ? "indisponible" : fmt1.format(p.tc), sur || "–"];
       }));
   }
 

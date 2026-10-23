@@ -638,6 +638,9 @@ def ecrire_accidents_et_communes(client, sortie, url_precedent, sources_meta, de
                                                     "blesses": [0] * len(national["annees"])}
                 grandes[code_com] = {"n": fiche["n"], "d": dep, "p": fiche["p"],
                                      "km": (fiche.get("km") or {}).get("t"), **cpt}
+                # Actifs allant travailler à vélo par recensement (nuage « pour 1 000 cyclistes »)
+                if cyclistes.format_valide(fiche.get("cyc")):
+                    grandes[code_com]["cy"] = {an: v[0] for an, v in fiche["cyc"].items()}
         national["grandes_communes"] = grandes
     else:
         ancien = fichier_precedent(client, url_precedent, "accidents/national.json") or {}

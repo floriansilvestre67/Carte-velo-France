@@ -147,13 +147,13 @@
           <p class="coef" id="coef-2" aria-live="polite"></p>
         </figure>
         <figure>
-          <figcaption>Accidents pour 100 000 hab. et km pour 10 000 hab.</figcaption>
-          <div class="cadre-graphe carre"><canvas id="g-c3" role="img" aria-label="Nuage de points : accidents pour 100 000 habitants selon les km d'aménagements pour 10 000 habitants"></canvas></div>
+          <figcaption id="cap-c3">Accidents pour 1 000 cyclistes (trajets domicile-travail) et km pour 10 000 hab.</figcaption>
+          <div class="cadre-graphe carre"><canvas id="g-c3" role="img" aria-label="Nuage de points : accidents pour 1 000 cyclistes allant travailler à vélo selon les km d'aménagements pour 10 000 habitants"></canvas></div>
           <label class="exclure"><input type="checkbox" id="excl-3"> <span id="excl-lib-3">Exclure les valeurs extrêmes</span></label>
           <p class="coef" id="coef-3" aria-live="polite"></p>
         </figure>
       </div>
-      <p class="interpretation">Une corrélation ne prouve pas une causalité. Là où l'on pédale beaucoup, on construit plus d'aménagements et on compte aussi plus d'accidents, simplement parce qu'il y a plus de cyclistes. Sans données sur le nombre de cyclistes, ces nuages ne disent pas si les aménagements rendent le vélo plus sûr.</p>
+      <p class="interpretation">Une corrélation ne prouve pas une causalité. Là où l'on pédale beaucoup, on construit plus d'aménagements et on compte aussi plus d'accidents, simplement parce qu'il y a plus de cyclistes. Le troisième nuage rapporte les accidents au nombre d'actifs qui vont travailler à vélo (recensements Insee 2017 et 2023, accidents à partir de 2017 seulement) : c'est l'approche la plus proche d'un « risque par cycliste », mais elle ignore les déplacements de loisirs, d'études et des retraités.</p>
       <details><summary>Voir les données</summary><div class="table-defile" id="d-correl"></div></details>
     </section>
 

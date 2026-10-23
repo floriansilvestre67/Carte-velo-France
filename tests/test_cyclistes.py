@@ -57,6 +57,8 @@ def test_cyclistes_publies(monde):
     assert zi[region]["cyc"]["2023"] is not None
     dep = lire_publie(sortie, "communes/63.json")
     assert dep["communes"]["63005"]["cyc"] == {"2017": [5, 400], "2023": [10, 410]}
+    assert nat["grandes_communes"]["75056"]["cy"] == {"2017": 50000, "2023": 90000}
+    assert nat["grandes_communes"]["75056"]["cy"] == {"2017": 50000, "2023": 90000}
 
 
 def test_cyclistes_en_panne(monde):
