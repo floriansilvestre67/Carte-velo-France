@@ -193,11 +193,30 @@
     // sa taille était nulle : on recadre dès qu'elle prend une vraie taille.
     if (window.ResizeObserver) {
       new ResizeObserver(function () {
-        var t = carte.getSize();
         carte.invalidateSize();
-        if (etat.cadrageAVide && t.x > 0 && t.y > 0) cadrerFrance();
+        var t = carte.getSize();
+        if (etat.cadrageAVide && t.x > 0 && t.y > 0) recadrerSelonEtat();
       }).observe($("carte"));
     }
+  }
+
+  /* Cadrage après que la carte a pris sa vraie taille (téléphone, onglet en arrière-plan) :
+     la ville choisie, sinon le département, sinon la région, sinon la France. */
+  function recadrerSelonEtat() {
+    etat.cadrageAVide = false;
+    if (etat.calqueVille) carte.fitBounds(etat.calqueVille.getBounds(), { padding: [30, 30], maxZoom: 13 });
+    else if (etat.selection && etat.couches[etat.selection]) carte.fitBounds(etat.couches[etat.selection].getBounds(), { padding: [30, 30], maxZoom: 9 });
+    else if (etat.region) cadrerRegion();
+    else cadrerFrance();
+  }
+
+  /* Recentre en tenant compte d'une carte encore sans taille : le cadrage est alors différé. */
+  function centrerSur(bornes, maxZoom) {
+    var t = carte.getSize();
+    if (!(t.x > 0 && t.y > 0)) { etat.cadrageAVide = true; return; }
+    // Onglet en arrière-plan : les animations y sont suspendues, on cadre directement.
+    if (document.hidden) carte.fitBounds(bornes, { padding: [30, 30], maxZoom: maxZoom, animate: false });
+    else carte.flyToBounds(bornes, { padding: [30, 30], maxZoom: maxZoom, duration: 0.6 });
   }
 
   function cadrerFrance() {
@@ -361,7 +380,7 @@
     majFiche();
     majAdresse();
     if (etat.selection && recentrer && etat.couches[etat.selection]) {
-      carte.flyToBounds(etat.couches[etat.selection].getBounds(), { padding: [30, 30], maxZoom: 9, duration: 0.6 });
+      centrerSur(etat.couches[etat.selection].getBounds(), 9);
     }
     if (etat.selection && window.matchMedia("(max-width: 820px)").matches) {
       $("fiche").scrollIntoView({ behavior: "smooth", block: "start" });
@@ -529,7 +548,7 @@
         if (forme) {
           etat.calqueVille = L.geoJSON(forme, { interactive: false,
             style: { color: "#1f2a2e", weight: 3, fill: true, fillColor: "#ffffff", fillOpacity: 0.12 } }).addTo(carte);
-          if (recentrer !== false) carte.flyToBounds(etat.calqueVille.getBounds(), { padding: [30, 30], maxZoom: 13, duration: 0.6 });
+          if (recentrer !== false) centrerSur(etat.calqueVille.getBounds(), 13);
         }
         dessinerFicheVille(f, code, forme);
         if (window.matchMedia("(max-width: 820px)").matches) fiche.scrollIntoView({ behavior: "smooth", block: "start" });

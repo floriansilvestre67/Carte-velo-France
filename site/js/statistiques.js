@@ -248,11 +248,14 @@
   function majChiffres(zone) {
     var z = zone.z, n = nbAnnees();
     var acc = somme(plage(z.acc));
+    // libellé au singulier ou au pluriel selon la valeur
+    var lib = function (v, un, plusieurs) { return v >= 2 ? plusieurs : un; };
+    var tues = somme(plage(z.tues)), hosp = somme(plage(z.hosp)), legers = somme(plage(z.legers));
     var items = [
-      [acc, "accidents"],
-      [somme(plage(z.tues)), "cyclistes tués"],
-      [somme(plage(z.hosp)), "blessés hospitalisés"],
-      [somme(plage(z.legers)), "blessés légers"]
+      [acc, lib(acc, "accident", "accidents")],
+      [tues, lib(tues, "cycliste tué", "cyclistes tués")],
+      [hosp, lib(hosp, "blessé hospitalisé", "blessés hospitalisés")],
+      [legers, lib(legers, "blessé léger", "blessés légers")]
     ];
     if (n > 1) items.push([acc / n, "accidents par an en moyenne", fmt1]);
     $("chiffres").innerHTML = items.map(function (it) {
