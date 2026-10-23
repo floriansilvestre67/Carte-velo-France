@@ -428,11 +428,27 @@
 
   // ---------------------------------------------------------------- ratios (tableau classable)
 
-  function ligneRatio(code, nom, accPeriode, pop, km, selection) {
+  // cyc : actifs allant travailler à vélo (Insee) ; absent = indisponible, jamais remplacé par 0
+  function ligneRatio(code, nom, accPeriode, pop, km, selection, cyc) {
     var n = nbAnnees(), parAn = accPeriode / n;
     return { code: code, nom: nom, acc: accPeriode, paran: parAn,
              parhab: pop ? parAn / pop * 1e5 : null, parkm: km ? parAn / km * 100 : null,
-             km: km, pop: pop, selection: !!selection };
+             parcyc: cyc ? parAn / cyc * 1000 : null,
+             km: km, pop: pop, cyc: cyc == null ? null : cyc, selection: !!selection };
+  }
+
+  // Texte d'avertissement sur la colonne « pour 1 000 cyclistes »
+  function aideCyclistes() {
+    var an = etat.nat.cyclistes_annee;
+    if (!an) return " Nombre de cyclistes indisponible lors de la dernière mise à jour.";
+    var t = " Cyclistes : actifs qui vont travailler principalement à vélo, d'après le recensement Insee " + an +
+      ". C'est une donnée sur une courte période : le vélo n'est compté à part que depuis 2015, et un seul millésime est utilisé ici," +
+      " quelle que soit la période choisie. Les autres déplacements (études, loisirs, retraités) ne sont pas comptés.";
+    if (etat.debut < 2017) {
+      t += " Attention : la période choisie commence en " + etat.debut +
+        ", bien avant ce recensement ; le rapport aux cyclistes n'est alors qu'un ordre de grandeur. Choisissez une période à partir de 2017 pour une comparaison plus juste.";
+    }
+    return t;
   }
 
   function majRatios(zone) {
@@ -442,7 +458,7 @@
     if (zone.type === "FR" || zone.type === "R") {
       zonesDe("D").filter(function (d) { return zone.type === "FR" || d.parent === zone.code; }).forEach(function (d) {
         var i = nat.zones_info["D" + d.code];
-        lignes.push(ligneRatio(d.code, d.nom, accZone("D" + d.code), i.pop, i.km));
+        lignes.push(ligneRatio(d.code, d.nom, accZone("D" + d.code), i.pop, i.km, false, i.cyc));
       });
       aide += "Une ligne par département.";
     } else {
@@ -454,23 +470,23 @@
         });
         Object.keys(par).forEach(function (c) {
           var info = f.communes[c] || {};
-          lignes.push(ligneRatio(c, info.n || c, par[c], info.p, (info.km || {}).t, c === etat.ville));
+          lignes.push(ligneRatio(c, info.n || c, par[c], info.p, (info.km || {}).t, c === etat.ville, (info.cyc || {}).v));
         });
         if (zone.type === "ville" && !par[etat.ville]) {
           var info = f.communes[etat.ville] || {};
-          lignes.push(ligneRatio(etat.ville, info.n || etat.ville, 0, info.p, (info.km || {}).t, true));
+          lignes.push(ligneRatio(etat.ville, info.n || etat.ville, 0, info.p, (info.km || {}).t, true, (info.cyc || {}).v));
         }
       });
       aide += "Une ligne par commune ayant au moins un accident sur la période, avec le total du département pour comparaison.";
       promesse = promesse.then(function () {
         var i = nat.zones_info["D" + dep];
-        lignes.push(ligneRatio("D" + dep, "Département : " + i.nom, accZone("D" + dep), i.pop, i.km, zone.type === "D"));
+        lignes.push(ligneRatio("D" + dep, "Département : " + i.nom, accZone("D" + dep), i.pop, i.km, zone.type === "D", i.cyc));
       });
     }
     return promesse.then(function () {
       var fr = nat.zones_info.FR;
-      lignes.push(ligneRatio("FR", "France métropolitaine", accZone("FR"), fr.pop, fr.km, zone.type === "FR"));
-      $("aide-ratios").textContent = aide + " Les valeurs suivies de « * » reposent sur moins de 10 accidents.";
+      lignes.push(ligneRatio("FR", "France métropolitaine", accZone("FR"), fr.pop, fr.km, zone.type === "FR", fr.cyc));
+      $("aide-ratios").textContent = aide + " Les valeurs suivies de « * » reposent sur moins de 10 accidents." + aideCyclistes();
       etat.lignesRatios = lignes;
       dessinerRatios();
     });
@@ -482,8 +498,10 @@
     { cle: "paran", titre: "Accidents par an", f: fmt1 },
     { cle: "parhab", titre: "Pour 100 000 hab. par an", f: fmt1 },
     { cle: "parkm", titre: "Pour 100 km d'aménagements par an", f: fmt2 },
+    { cle: "parcyc", titre: "Pour 1 000 cyclistes (trajets domicile-travail) par an", f: fmt1 },
     { cle: "km", titre: "Km d'aménagements" },
-    { cle: "pop", titre: "Population" }
+    { cle: "pop", titre: "Population" },
+    { cle: "cyc", titre: "Actifs allant travailler à vélo" }
   ];
 
   function dessinerRatios() {
@@ -506,8 +524,8 @@
       html += '<tr class="' + (l.selection ? "selection" : "") + '">' + COLONNES.map(function (c, i) {
         var v = l[c.cle];
         if (i === 0) return '<th scope="row">' + echapper(v) + "</th>";
-        var txt = v == null ? "indisponible" : (c.f || fmt0).format(v);
-        if (peu && (c.cle === "paran" || c.cle === "parhab" || c.cle === "parkm") && v != null) txt += "*";
+        var txt = v == null ? (c.cle === "parcyc" && l.cyc === 0 ? "non calculable" : "indisponible") : (c.f || fmt0).format(v);
+        if (peu && (c.cle === "paran" || c.cle === "parhab" || c.cle === "parkm" || c.cle === "parcyc") && v != null) txt += "*";
         return '<td class="' + (peu ? "peu" : "") + '">' + txt + "</td>";
       }).join("") + "</tr>";
     });

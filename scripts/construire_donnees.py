@@ -28,7 +28,7 @@ from pathlib import Path
 
 import indicateurs
 from reseau import ClientHTTP
-from sources import (accidents, amenagements, baac, communes, contours_communes, departements, poi, regions,
+from sources import (accidents, amenagements, baac, communes, contours_communes, cyclistes, departements, poi, regions,
                      stationnement, vls)
 
 TAILLE_MAX = 50 * 1024 * 1024  # 50 Mo par fichier publié
@@ -357,6 +357,28 @@ def construire(client, sortie: Path, travail: Path, url_precedent: str | None = 
         traceback.print_exc()
         accs = None
 
+    # 5 bis. Cyclistes : actifs allant travailler à vélo (Insee, recensement)
+    journal("   Actifs allant travailler à vélo (Insee)…")
+    cyc = None
+    try:
+        chemin = client.telecharger(cyclistes.URL_FICHIER, travail / "insee-emploi.zip")
+        cyc = cyclistes.lire(chemin, correspondance)
+        cyc["par_dep"] = cyclistes.par_departement(cyc["communes"], correspondance)
+        total = sum(v for d, v in cyc["par_dep"].items() if d in codes)
+        sources_meta["cyclistes"] = {
+            "statut": "ok", "url": cyclistes.URL_PAGE, "annee": cyc["annee"],
+            "detail": (f"Recensement {cyc['annee']} : {total:_} actifs vont travailler à vélo en métropole "
+                       f"({cyc['stats']['communes']:_} communes)").replace("_", " ")}
+        journal(f"  {cyc['stats']}, millésime {cyc['annee']}")
+    except Exception as e:
+        journal(f"  ✗ {e}")
+        cyc = None
+    # Diagnostic provisoire : structure du millésime 2023 (nouveau format Insee), sans effet sur les données
+    try:
+        cyclistes.decrire_zip(client.telecharger(cyclistes.URL_DIAG_2023, travail / "insee-2023.zip"), journal)
+    except Exception as e:
+        journal(f"  [diag Insee] impossible : {e}")
+
     # 6. Indicateurs
     journal("6/6 Indicateurs et score…")
     liste_props = indicateurs.calculer([props[d["code"]] for d in deps])
@@ -364,7 +386,8 @@ def construire(client, sortie: Path, travail: Path, url_precedent: str | None = 
     region_de = {c: p.get("region") for c, p in par_code.items()}
 
     ecrire_accidents_et_communes(client, sortie, url_precedent, sources_meta, deps, par_code, region_de,
-                                 liste_communes, correspondance, km_communes, accs, vls_communes, stat_communes)
+                                 liste_communes, correspondance, km_communes, accs, vls_communes, stat_communes,
+                                 cyc)
     ecrire_stationnement(client, sortie, url_precedent, codes, emplacements_osm, sources_meta)
     if poi_par_dep is not None:
         total = 0
@@ -444,7 +467,7 @@ def ecrire_communes_carte(client, sortie, url_precedent, codes, liste_communes, 
 
 def ecrire_accidents_et_communes(client, sortie, url_precedent, sources_meta, deps, par_code, region_de,
                                  liste_communes, correspondance, km_communes, accs, vls_communes=None,
-                                 stat_communes=None) -> None:
+                                 stat_communes=None, cyc=None) -> None:
     """Écrit accidents/national.json et communes/{dep}.json.
 
     Chaque composante manquante aujourd'hui (liste des communes, km par commune,
@@ -531,6 +554,16 @@ def ecrire_accidents_et_communes(client, sortie, url_precedent, sources_meta, de
             for code_com, fiche in communes_dep.items():
                 if (ancien_vls.get(code_com) or {}).get("vls") is not None:
                     fiche["vls"] = ancien_vls[code_com]["vls"]
+        # Actifs allant travailler à vélo (Insee) : cyc = {"v": à vélo, "a": actifs occupés}
+        if cyc is not None:
+            for code_com, fiche in communes_dep.items():
+                if code_com in cyc["communes"]:
+                    fiche["cyc"] = cyc["communes"][code_com]
+        else:
+            ancien_cyc = (precedent_dep(dep).get("communes") or {})
+            for code_com, fiche in communes_dep.items():
+                if (ancien_cyc.get(code_com) or {}).get("cyc") is not None:
+                    fiche["cyc"] = ancien_cyc[code_com]["cyc"]
         if accs:
             lignes = [accidents.enregistrement(a, correspondance) for a in accs if a["dep"] == dep]
         else:
@@ -560,6 +593,28 @@ def ecrire_accidents_et_communes(client, sortie, url_precedent, sources_meta, de
             regions_vues.setdefault(par_code[c]["region"], {"nom": par_code[c]["region_nom"], "deps": []})["deps"].append(c)
     for r, v in regions_vues.items():
         infos["R" + r] = {"nom": v["nom"], "pop": somme(v["deps"], "population"), "km": somme(v["deps"], "km_total")}
+    # Cyclistes (Insee) par zone : somme des communes ; repris de la version en ligne si l'Insee est injoignable
+    if cyc is not None:
+        def somme_cyc(deps_zone):
+            vals = [cyc["par_dep"].get(c) for c in deps_zone]
+            return None if any(v is None for v in vals) else sum(vals)
+        for cle, info in infos.items():
+            deps_zone = codes if cle == "FR" else [cle[1:]] if cle[0] == "D" else regions_vues[cle[1:]]["deps"]
+            info["cyc"] = somme_cyc(deps_zone)
+        national["cyclistes_annee"] = cyc["annee"]
+    else:
+        ancien = fichier_precedent(client, url_precedent, "accidents/national.json") or {}
+        for cle, info in infos.items():
+            info["cyc"] = ((ancien.get("zones_info") or {}).get(cle) or {}).get("cyc")
+        if ancien.get("cyclistes_annee"):
+            national["cyclistes_annee"] = ancien["cyclistes_annee"]
+            sources_meta["cyclistes"] = {"statut": "reprise", "url": cyclistes.URL_PAGE,
+                                         "annee": ancien["cyclistes_annee"],
+                                         "detail": "Source injoignable aujourd'hui : chiffres repris de la "
+                                                   "mise à jour précédente."}
+        else:
+            national.pop("cyclistes_annee", None)
+            sources_meta["cyclistes"] = {"statut": "indisponible", "detail": "Source injoignable."}
     national["zones_info"] = infos
 
     # Grandes communes (corrélations) : population, km et accidents par année

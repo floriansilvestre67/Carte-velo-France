@@ -20,7 +20,7 @@ import pytest
 RACINE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RACINE / "scripts"))
 
-from sources import (accidents, amenagements, baac, communes, contours_communes, departements, poi,  # noqa: E402
+from sources import (accidents, amenagements, baac, communes, contours_communes, cyclistes, departements, poi,  # noqa: E402
                      regions, stationnement, vls)
 
 CODES = [f"{i:02d}" for i in range(1, 96) if i != 20] + ["2A", "2B"]
@@ -340,6 +340,29 @@ def jeu_datagouv():
     ]}
 
 
+def insee_fictif(d: Path, urls: dict) -> None:
+    """Base Insee « Caractéristiques de l'emploi » : CSV « ; » dans un zip, avec un fichier de
+    métadonnées à ignorer, des valeurs décimales (exploitation pondérée) et les arrondissements."""
+    entete = ["CODGEO", "LIBGEO", "P21_EMPLT", "P21_ACTOCC15P", "P21_ACTOCC15P_VOIT", "P21_ACTOCC15P_VELO"]
+    lignes = [entete]
+    for code in CODES:
+        for k in range(1, 13):
+            lignes.append([f"{code}{k:03d}", f"Commune {code}-{k}", "500", "400,5", "300", f"{k}.4"])
+    # Paris : commune entière ET arrondissements (ne pas compter deux fois)
+    lignes.append(["75056", "Paris", "1000000", "1000000", "100000", "70000.2"])
+    lignes.append(["75101", "Paris 1er", "50000", "10000", "1000", "900"])
+    # Lyon : seulement les arrondissements (à additionner)
+    lignes.append(["69381", "Lyon 1er", "20000", "15000", "2000", "1500.5"])
+    lignes.append(["69382", "Lyon 2e", "20000", "15000", "2000", "1499.5"])
+    lignes.append(["97411", "Saint-Denis", "1", "1", "1", "1"])          # hors métropole
+    lignes.append(["00000", "Inconnue", "1", "1", "1", "1"])              # code inconnu
+    chemin = d / "insee.zip"
+    with zipfile.ZipFile(chemin, "w") as z:
+        z.writestr("base-cc-caract_emp-2021.CSV", "\n".join(";".join(l) for l in lignes))
+        z.writestr("meta_base-cc-caract_emp-2021.CSV", "COD_VAR;LIB_VAR\nP21_ACTOCC15P_VELO;Actifs à vélo")
+    urls[cyclistes.URL_FICHIER] = chemin
+
+
 @pytest.fixture
 def monde(tmp_path):
     """Écrit tous les fichiers fictifs et renvoie {url: chemin} + infos utiles."""
@@ -483,4 +506,5 @@ def monde(tmp_path):
         {"title": "Horaires bus", "type": "public-transit", "resources": [{"format": "GTFS", "url": "x"}]},
     ]
     urls[vls.URL_API_JEUX] = ecrire(d, "transport.json", jeux)
+    insee_fictif(d, urls)
     return {"urls": urls, "dossier": tmp_path, "urls_baac": urls_baac}

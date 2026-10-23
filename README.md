@@ -55,6 +55,7 @@ scripts/
     amenagements.py       aménagements cyclables (lecture en streaming)
     vls.py                vélos en libre-service (GBFS 1.x, 2.x, 3.x)
     baac.py               fichiers officiels des accidents (BAAC, ONISR)
+    cyclistes.py          actifs allant travailler à vélo (recensement Insee)
     accidents.py          accidents de vélo : regroupement, codes, agrégats
     stationnement.py      stationnement vélo (indicateurs Ecolab, emplacements OSM)
     poi.py                lieux à visiter (DATAtourisme, Mérimée, Muséofile)
@@ -84,6 +85,7 @@ site/
 | Contours des départements | [gregoiredavid/france-geojson](https://github.com/gregoiredavid/france-geojson) | voir le dépôt |
 | Contours des communes | [Etalab, contours administratifs](https://etalab-datasets.geo.data.gouv.fr/contours-administratifs/latest/geojson/) | Licence Ouverte |
 | Accidents de vélo | [Fichiers BAAC de l'ONISR](https://www.data.gouv.fr/datasets/bases-de-donnees-annuelles-des-accidents-corporels-de-la-circulation-routiere-annees-de-2005-a-2024/) (ministère de l'Intérieur) | Licence Ouverte |
+| Actifs allant travailler à vélo | [Recensement de la population, Insee](https://www.insee.fr/fr/statistiques/8200707) | Réutilisation libre, avec mention de la source |
 | Stationnement (indicateurs) | [Ecolab, places de stationnement vélo](https://www.data.gouv.fr/datasets/nombre-de-places-de-stationnement-velo) et [places sécurisées](https://www.data.gouv.fr/datasets/nombre-de-places-de-stationnement-velo-securisees-type-accroche-cadre-et-roue-ou-cadre-pour-1000-hab) | ODbL |
 | Lieux à visiter | [DATAtourisme](https://www.data.gouv.fr/datasets/5b598be088ee387c0c353714), [Monuments historiques (Mérimée)](https://www.data.gouv.fr/datasets/immeubles-proteges-au-titre-des-monuments-historiques-2), [Musées de France (Muséofile)](https://www.data.gouv.fr/datasets/musees-de-france-base-museofile) | Licence Ouverte |
 | Stationnement (emplacements) | [Stationnements cyclables issus d'OpenStreetMap](https://www.data.gouv.fr/datasets/stationnements-cyclables-issus-dopenstreetmap) | ODbL |

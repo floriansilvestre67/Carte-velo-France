@@ -8,6 +8,7 @@
     amenagements: "Aménagements cyclables",
     vls: "Vélos en libre-service",
     accidents: "Accidents de vélo",
+    cyclistes: "Actifs allant travailler à vélo (Insee)",
     contours_communes: "Contours des communes",
     stationnement: "Stationnement (indicateurs officiels)",
     stationnement_osm: "Stationnement (emplacements OSM)",
