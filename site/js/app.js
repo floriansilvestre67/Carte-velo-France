@@ -655,7 +655,7 @@
         liste.map(function (a) { var v = par[a] || { acc: 0, tues: 0, blesses: 0 };
           return '<tr><th scope="row">' + a + "</th><td>" + v.acc + "</td><td>" + v.tues + "</td><td>" + v.blesses + "</td></tr>"; }).join("") +
         "</tbody></table></details>";
-      html += '<p class="note-ville">À partir de 2018, la source sous-estime les accidents (vélos électriques probablement absents).</p>';
+      html += '<p class="note-ville">Accidents corporels constatés par les forces de l\'ordre (fichiers BAAC de l\'ONISR).</p>';
     }
     html += '<h3 class="titre-section-ville">Lieux à voir</h3><div id="lieux-ville"><p class="indispo">Chargement…</p></div>';
     var st = new URLSearchParams({ ville: code });

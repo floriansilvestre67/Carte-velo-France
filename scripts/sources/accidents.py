@@ -1,12 +1,9 @@
-"""Accidents de vélo : jeu « Accidents de vélo » d'Opendatasoft/Koumoul (data-fair),
-construit à partir des fichiers BAAC de l'ONISR (Licence Ouverte).
+"""Accidents de vélo : regroupement des cyclistes en accidents, codes harmonisés, agrégats.
 
-Récupération : API data-fair /lines en JSON, par pages de 10 000 lignes, en ne demandant
-que les colonnes utiles (≈ 8 requêtes, ≈ 10 Mo). Plus simple et plus sûr que l'export CSV :
-types JSON, pas de séparateur ni d'encodage à deviner.
+Les lignes viennent des fichiers officiels BAAC de l'ONISR (voir sources/baac.py) :
+une ligne par CYCLISTE (conducteur ou passager d'un vélo ou d'un VAE).
 
 Unités :
-  - une LIGNE de la source = un CYCLISTE impliqué (victime ou indemne) ;
   - un ACCIDENT = un identifiant Num_Acc distinct ;
   - gravité d'un accident = gravité du cycliste le plus gravement atteint.
 
@@ -16,8 +13,8 @@ Codes BAAC (documentation ONISR « Description des bases de données annuelles �
          9 autre ; 0 et -1 = non renseigné (0 est utilisé ainsi avant 2019)
   situ   1 chaussée, 2 bande d'arrêt d'urgence, 3 accotement, 4 trottoir, 5 piste cyclable,
          6 autre voie spéciale et 8 autres (codes créés en 2019) ; 0 et -1 = non renseigné
-  typevehicules : catv des AUTRES véhicules, éventuellement plusieurs (« 7 / 18 »)
-  obsm   obstacle mobile heurté ; 1 = piéton
+  typevehicules : catv des AUTRES véhicules de l'accident (« 7 / 18 »)
+  obsm   « 1 » si un piéton a été heurté par le vélo
 """
 
 from __future__ import annotations
@@ -25,11 +22,6 @@ from __future__ import annotations
 from collections import defaultdict
 
 from sources.communes import commune_entiere, departement_du_code
-
-URL_JEU = "https://opendata.koumoul.com/data-fair/api/v1/datasets/accidents-velos"
-URL_PAGE_JEU = "https://opendata.koumoul.com/datasets/accidents-velos"
-CHAMPS = "Num_Acc,an,dep,com,grav,trajet,situ,typevehicules,numVehicules,obsm"
-URL_LIGNES = f"{URL_JEU}/lines?size=10000&select={CHAMPS}&sort=_i"
 
 # --- Libellés harmonisés (l'ordre fixe l'indice utilisé dans les fichiers publiés) ---
 
@@ -59,16 +51,9 @@ CODE_SITU = {"1": 0, "5": 1, "4": 2, "3": 3, "2": 4, "6": 5, "8": 6}
 
 # Ruptures de série affichées sur le site
 RUPTURES = [
-    {"annees": [2018, 2018], "texte": "En 2018 et en 2023, la base est très incomplète dans certains territoires : "
-     "Paris compte 374 cyclistes en 2018 et 41 en 2023, contre environ 1 000 les autres années ; les Bouches-du-Rhône "
-     "passent d'environ 100 accidents par an à environ 30 dès 2018. Les classements et corrélations qui incluent "
-     "ces années sont faussés."},
-    {"annees": [2023, 2023], "texte": "L'année 2023 est très incomplète dans cette base (par exemple 41 cyclistes "
-     "à Paris contre 1 038 en 2022). Ne pas la comparer aux autres années."},
-    {"annees": [2018, None], "texte": "À partir de 2018, cette base compte nettement moins de cyclistes que "
-     "les bilans officiels de l'ONISR (par exemple 156 tués en 2023 contre 226). Elle semble ne pas inclure "
-     "les vélos à assistance électrique, codés à part depuis 2018. Les années 2018 et suivantes ne sont donc "
-     "pas comparables aux précédentes, et les chiffres récents sont sous-estimés."},
+    {"annees": [2018, None], "texte": "Depuis 2018, les vélos à assistance électrique ont leur propre catégorie "
+     "dans les fichiers ; ils sont comptés ici avec les vélos classiques. La façon dont ils étaient enregistrés "
+     "avant 2018 n'est pas documentée : la comparaison avant et après 2018 demande un peu de prudence."},
     {"annees": [2019, None], "texte": "Depuis 2019, l'ONISR ne labellise plus l'indicateur « blessé "
      "hospitalisé » comme statistique publique : la donnée existe toujours mais doit être lue avec prudence."},
     {"annees": [2019, None], "texte": "Les situations « autre voie spéciale » et « autre » n'existent que "
@@ -107,25 +92,6 @@ def groupes_vehicules(typevehicules) -> list[int]:
         if morceau.lstrip("-").isdigit():
             groupes.append(CATV_GROUPE.get(int(morceau), V_AUTRE))
     return groupes
-
-
-def lire_lignes(client):
-    """Itère sur toutes les lignes de la source (pagination data-fair par « next »)."""
-    url, pages, lues, total = URL_LIGNES, 0, 0, None
-    while url:
-        page = client.get_json(url)
-        pages += 1
-        total = page.get("total", total)
-        resultats = page.get("results") or []
-        for ligne in resultats:
-            lues += 1
-            yield ligne
-        url = page.get("next") if resultats else None
-        if pages > 200:
-            raise ValueError("Pagination anormalement longue")
-    # Garde-fou : ne jamais publier une série tronquée sans le savoir
-    if isinstance(total, int) and lues < total:
-        raise ValueError(f"Lecture incomplète : {lues} lignes sur {total} annoncées")
 
 
 def construire_accidents(lignes, codes_valides: set[str], correspondance=None) -> dict:
@@ -255,13 +221,3 @@ def enregistrement(a: dict, correspondance=None) -> list:
 
 CHAMPS_ENREGISTREMENT = ["an", "com", "arr", "gravite", "vehicule", "trajet", "situ",
                          "tues", "hosp", "legers", "indemnes", "gravite_nr"]
-
-
-def metadonnees(client) -> dict:
-    """Date de mise à jour et nombre de lignes annoncés par la source."""
-    try:
-        m = client.get_json(URL_JEU)
-        return {"maj": (m.get("dataUpdatedAt") or m.get("updatedAt") or "")[:10] or None,
-                "lignes": m.get("count")}
-    except Exception:
-        return {"maj": None, "lignes": None}

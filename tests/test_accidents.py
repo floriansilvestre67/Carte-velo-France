@@ -6,7 +6,7 @@ import pytest
 from conftest import ligne
 from test_pipeline import lancer
 
-from sources import accidents, amenagements
+from sources import accidents, amenagements, baac
 from sources.accidents import G_GRAVE, G_INDEMNE, G_MORTEL, G_NR
 from sources.communes import Correspondance, commune_entiere
 
@@ -45,6 +45,27 @@ def test_correspondance_anciennes_communes():
     assert c.departement("12345") == "12"
 
 
+def test_baac_lieu_ancien_format():
+    assert baac.lieu_ancien_format("590", "350") == ("59", "59350")
+    assert baac.lieu_ancien_format("10", "5") == ("01", "01005")       # Ain : « 10 » = 01
+    assert baac.lieu_ancien_format("201", "004") == ("2A", "2A004")
+    assert baac.lieu_ancien_format("202", "33") == ("2B", "2B033")
+    assert baac.lieu_ancien_format("750", "117") == ("75", "75117")
+    assert baac.lieu_ancien_format("", "1") == (None, None)
+
+
+def test_baac_inventaire(monde):
+    from reseau import ClientFichiers
+    inv = baac.inventaire(ClientFichiers(monde["urls"]))
+    assert list(inv["annees"]) == [2010, 2019, 2020, 2021, 2022, 2023]
+    assert set(inv["annees"][2021]) == {"caract", "lieux", "vehicules", "usagers"}
+    assert "immatricul" not in inv["annees"][2021]["vehicules"]
+    assert inv["maj"] == "2025-12-29" and inv["version"].startswith(f"{baac.VERSION}-")
+    assert baac.table_de({"title": "carcteristiques-2022.csv"}) == "caract"
+    assert baac.table_de({"title": "Caract_2024.csv"}) == "caract"
+    assert baac.table_de({"title": "vehicules-immatricules-baac-2023.csv"}) is None
+
+
 def test_groupes_vehicules():
     assert accidents.groupes_vehicules("7 / 18") == [0, 3]
     assert accidents.groupes_vehicules("80") == [5]
@@ -74,7 +95,7 @@ def test_accidents_regroupes(resultat):
     fr = national["zones"]["FR"]
     assert sum(fr["acc"]) == 6                     # 7 Num_Acc distincts, dont 1 outre-mer écarté
     assert sum(fr["tues"]) == 1 and sum(fr["legers"]) == 3 and sum(fr["hosp"]) == 1
-    assert sum(fr["indemnes"]) == 1 and sum(fr["nr"]) == 1
+    assert sum(fr["indemnes"]) == 2 and sum(fr["nr"]) == 1     # C : deux cyclistes indemnes (vélo + VAE)
 
     a = next(x for x in acc(fichiers, "63") if x["an"] == 2021)
     assert a["gravite"] == G_MORTEL and a["tues"] == 1 and a["legers"] == 1
@@ -89,7 +110,7 @@ def test_accidents_regroupes(resultat):
     c = acc(fichiers, "01")[0]
     assert c["gravite"] == G_INDEMNE and c["trajet"] == 6 and c["situ"] == 7 and c["vehicule"] == 5
 
-    e = next(x for x in acc(fichiers, "63") if x["an"] == 2015)
+    e = next(x for x in acc(fichiers, "63") if x["an"] == 2020)
     assert e["com"] == "63001" and e["arr"] == ""              # ancienne commune rattachée
     assert e["gravite"] == G_NR and e["vehicule"] == 2 and e["situ"] == 5
     assert "971" not in fichiers
@@ -117,8 +138,8 @@ def test_communes_km_et_grandes_communes(resultat):
     assert c63["63005"]["km"] == {"t": 0}           # aucune piste : 0 et non « indisponible »
     assert fichiers["75"]["communes"]["75056"]["km"]["pistes"] == pytest.approx(L("75", 0.02), abs=0.01)
     g = national["grandes_communes"]
-    i2021, i2015 = national["annees"].index(2021), national["annees"].index(2015)
-    assert g["63001"]["acc"][i2021] == 1 and g["63001"]["acc"][i2015] == 1   # dont l'ancienne commune
+    i2021, i2020 = national["annees"].index(2021), national["annees"].index(2020)
+    assert g["63001"]["acc"][i2021] == 1 and g["63001"]["acc"][i2020] == 1   # dont l'ancienne commune
     assert g["75056"]["acc"][national["annees"].index(2010)] == 1             # arrondissement regroupé
     assert g["69123"]["acc"][national["annees"].index(2023)] == 1
     assert all(v["p"] >= 10_000 for v in g.values())
@@ -126,7 +147,7 @@ def test_communes_km_et_grandes_communes(resultat):
 
 def test_accidents_indisponibles(monde):
     urls = dict(monde["urls"])
-    urls[accidents.URL_LIGNES] = None
+    urls[baac.URL_API] = None
     meta, props, _, sortie = lancer(monde, urls=urls)
     assert meta["sources"]["accidents"]["statut"] == "indisponible"
     assert not (sortie / "accidents" / "national.json").exists()
@@ -143,7 +164,7 @@ def test_accidents_reprise(monde):
         urls[base + "data/" + f.relative_to(sortie).as_posix()] = f
     for f in sortie.glob("*.geojson"):
         urls[base + "data/" + f.name] = f
-    urls[accidents.URL_LIGNES] = None
+    urls[baac.URL_API] = None
     meta, _, _, sortie2 = lancer(monde, "v2", urls=urls, precedent=base)
     assert meta["sources"]["accidents"]["statut"] == "reprise"
     f = json.loads((sortie2 / "communes" / "63.json").read_text(encoding="utf-8"))
@@ -152,9 +173,25 @@ def test_accidents_reprise(monde):
     assert sum(nat["zones"]["FR"]["acc"]) == 6
 
 
-def test_lecture_incomplete_detectee(monde):
+def test_annee_illisible_detectee(monde):
+    """Une table annuelle injoignable fait échouer l'ensemble : pas de série trouée publiée."""
     urls = dict(monde["urls"])
-    from conftest import KOUMOUL_PAGE2
-    urls[KOUMOUL_PAGE2] = None   # 2e page injoignable : on ne publie pas une série tronquée
+    urls[monde["urls_baac"][(2021, "usagers")]] = None
     meta, _, _, _ = lancer(monde, urls=urls)
     assert meta["sources"]["accidents"]["statut"] == "indisponible"
+
+
+def test_fichiers_inchanges_pas_de_nouveau_calcul(monde):
+    _, _, _, s1 = lancer(monde, "v1")
+    base = "https://site.example/"
+    urls = dict(monde["urls"])
+    for f in s1.rglob("*"):
+        if f.is_file():
+            urls[base + "data/" + f.relative_to(s1).as_posix()] = f
+    for u in monde["urls_baac"].values():        # les gros fichiers ne doivent pas être relus
+        urls[u] = None
+    meta, _, _, s2 = lancer(monde, "v2", urls=urls, precedent=base)
+    assert meta["sources"]["accidents"]["statut"] == "ok"
+    n1 = json.loads((s1 / "accidents" / "national.json").read_text(encoding="utf-8"))
+    n2 = json.loads((s2 / "accidents" / "national.json").read_text(encoding="utf-8"))
+    assert n1["zones"] == n2["zones"] and n1["grandes_communes"] == n2["grandes_communes"]

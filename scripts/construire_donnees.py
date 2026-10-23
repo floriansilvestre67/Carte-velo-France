@@ -5,7 +5,7 @@
   2. population et surface       (geo.api.gouv.fr)
   3. aménagements cyclables      (data.gouv.fr, schéma BNAC)
   4. vélos en libre-service      (flux GBFS de transport.data.gouv.fr)
-  5. accidents de vélo            (Koumoul / ONISR)
+  5. accidents de vélo            (fichiers BAAC de l'ONISR)
   6. indicateurs, rangs et score vélo
   7. écriture des fichiers : departements.geojson, stations.json, meta.json,
      accidents/national.json et communes/{département}.json
@@ -28,7 +28,7 @@ from pathlib import Path
 
 import indicateurs
 from reseau import ClientHTTP
-from sources import (accidents, amenagements, communes, contours_communes, departements, poi, regions,
+from sources import (accidents, amenagements, baac, communes, contours_communes, departements, poi, regions,
                      stationnement, vls)
 
 TAILLE_MAX = 50 * 1024 * 1024  # 50 Mo par fichier publié
@@ -327,24 +327,35 @@ def construire(client, sortie: Path, travail: Path, url_precedent: str | None = 
             else:
                 sources_meta["poi"] = {"statut": "indisponible", "detail": f"Sources injoignables : {e}"}
 
-    # 5. Accidents de vélo
-    journal("5/6 Accidents de vélo (Koumoul / ONISR)…")
+    # 5. Accidents de vélo (fichiers BAAC de l'ONISR)
+    journal("5/6 Accidents de vélo (fichiers BAAC de l'ONISR)…")
     accs = None
+    ancien_acc = ((precedent or {}).get("meta", {}).get("sources") or {}).get("accidents") or {}
     try:
-        info = accidents.metadonnees(client)
-        res_acc = accidents.construire_accidents(accidents.lire_lignes(client), codes, correspondance)
-        accs = res_acc["accidents"]
-        st = res_acc["stats"]
-        annees = sorted({a["an"] for a in accs})
-        sources_meta["accidents"] = {
-            "statut": "ok", "url": accidents.URL_PAGE_JEU, "date_donnees": info["maj"],
-            "annees": [annees[0], annees[-1]],
-            "detail": f"{st['accidents']:,} accidents ({st['lignes']:,} cyclistes) de {annees[0]} à {annees[-1]} ; "
-                      f"{st.get('lignes_hors_metropole', 0):,} lignes hors métropole écartées".replace(",", " ")}
-        journal(f"  {st}")
+        inv = baac.inventaire(client)
+        annees_dispo = list(inv["annees"])
+        if ancien_acc.get("version") == inv["version"] and ancien_acc.get("statut") == "ok":
+            # Fichiers inchangés depuis le dernier calcul : on repart des accidents déjà publiés
+            accs = accidents_publies(client, url_precedent, codes)
+            if accs:
+                sources_meta["accidents"] = ancien_acc
+                journal(f"  fichiers BAAC inchangés : {len(accs)} accidents repris")
+        if accs is None:
+            lignes = baac.lire_tout(client, travail, inv, journal)
+            res_acc = accidents.construire_accidents(lignes, codes, correspondance)
+            accs = res_acc["accidents"]
+            st = res_acc["stats"]
+            sources_meta["accidents"] = {
+                "statut": "ok", "url": baac.URL_PAGE, "date_donnees": inv["maj"], "version": inv["version"],
+                "annees": [annees_dispo[0], annees_dispo[-1]],
+                "detail": (f"{st['accidents']:_} accidents impliquant un vélo ({st['lignes']:_} cyclistes) de "
+                           f"{annees_dispo[0]} à {annees_dispo[-1]} ; {st.get('lignes_hors_metropole', 0):_} "
+                           f"cyclistes hors métropole écartés").replace("_", " ")}
+            journal(f"  {st}")
     except Exception as e:
         journal(f"  ✗ {e}")
         traceback.print_exc()
+        accs = None
 
     # 6. Indicateurs
     journal("6/6 Indicateurs et score…")
@@ -374,6 +385,23 @@ def construire(client, sortie: Path, travail: Path, url_precedent: str | None = 
         taille = ecrire_json(sortie / nom, contenu)
         journal(f"  → {sortie / nom} ({taille / 1024:.0f} Ko)")
     return meta
+
+
+def accidents_publies(client, url_precedent, codes) -> list[dict] | None:
+    """Reconstitue la liste des accidents à partir des fichiers par département déjà en ligne."""
+    accs = []
+    for dep in codes:
+        f = fichier_precedent(client, url_precedent, f"communes/{dep}.json")
+        if not f or "accidents" not in f:
+            return None
+        champs = f["accidents"]["champs"]
+        for l in f["accidents"]["lignes"]:
+            k = dict(zip(champs, l))
+            accs.append({"an": k["an"], "dep": dep, "com": k.get("arr") or k.get("com") or None,
+                         "g": k["gravite"], "v": k["vehicule"], "t": k["trajet"], "s": k["situ"],
+                         "tues": k["tues"], "hosp": k["hosp"], "legers": k["legers"],
+                         "indemnes": k["indemnes"], "nr": k["gravite_nr"]})
+    return accs or None
 
 
 def ecrire_stationnement(client, sortie, url_precedent, codes, emplacements_osm, sources_meta) -> None:

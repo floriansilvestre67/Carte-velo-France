@@ -20,7 +20,7 @@ import pytest
 RACINE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RACINE / "scripts"))
 
-from sources import (accidents, amenagements, communes, contours_communes, departements, poi,  # noqa: E402
+from sources import (accidents, amenagements, baac, communes, contours_communes, departements, poi,  # noqa: E402
                      regions, stationnement, vls)
 
 CODES = [f"{i:02d}" for i in range(1, 96) if i != 20] + ["2A", "2B"]
@@ -210,37 +210,97 @@ def liste_communes():
     return liste
 
 
-KOUMOUL_PAGE2 = accidents.URL_LIGNES + "&after=7"
+# --------------------------------------------------------------------------
+# Fichiers BAAC fictifs : mêmes cas particuliers que dans la réalité
+# --------------------------------------------------------------------------
+
+ANCIEN = {"caract": ["Num_Acc", "an", "mois", "jour", "hrmn", "lum", "agg", "int", "atm", "col", "com", "adr",
+                     "gps", "lat", "long", "dep"],
+          "lieux": ["Num_Acc", "catr", "voie", "circ", "nbv", "situ"],
+          "vehicules": ["Num_Acc", "senc", "catv", "occutc", "obs", "obsm", "choc", "manv", "num_veh"],
+          "usagers": ["Num_Acc", "place", "catu", "grav", "sexe", "trajet", "secu", "an_nais", "num_veh"]}
+NOUVEAU = {"caract": ["Num_Acc", "jour", "mois", "an", "hrmn", "lum", "dep", "com", "agg", "lat", "long"],
+           "lieux": ["Num_Acc", "catr", "voie", "circ", "nbv", "vosp", "situ"],
+           "vehicules": ["Num_Acc", "id_vehicule", "num_veh", "senc", "catv", "obs", "obsm", "choc", "manv"],
+           "usagers": ["Num_Acc", "id_usager", "id_vehicule", "num_veh", "place", "catu", "grav", "sexe",
+                       "an_nais", "trajet"]}
 
 
-def ligne_acc(num, an, dep, com, grav, trajet="5", situ="1", typevehicules="7", obsm="2", num_veh=1):
-    return {"Num_Acc": num, "an": an, "dep": dep, "com": com, "grav": grav, "trajet": trajet, "situ": situ,
-            "typevehicules": typevehicules, "numVehicules": num_veh, "obsm": obsm}
+def accident_baac(num, dep, com, situ, vehicules, usagers):
+    """vehicules : [(num_veh, catv, obsm)] ; usagers : [(num_veh, catu, grav, trajet)]"""
+    return {"num": num, "dep": dep, "com": com, "situ": situ, "vehicules": vehicules, "usagers": usagers}
 
 
-def koumoul():
-    """Deux pages au format de l'API data-fair /lines, avec les cas particuliers connus."""
-    page1 = [
-        # A : deux cyclistes dans le même accident (un tué, un blessé léger), bus + voiture, sur piste
-        ligne_acc("202100000001", 2021, "63", "63001", "4", trajet="1", situ="5", typevehicules="7 / 18"),
-        ligne_acc("202100000001", 2021, "63", "63001", "2", trajet="5", situ="5", typevehicules="7 / 18"),
-        # B : Paris, ancien format « 750NN », piéton heurté, sans autre véhicule
-        ligne_acc("201000000002", 2010, "75", "75012", "3", typevehicules=None, obsm="1", num_veh=None),
-        # C : département sans zéro initial, motif et situation non renseignés (code 0), VAE en face
-        ligne_acc("201900000003", 2019, "1", "01005", "1", trajet="0", situ="0", typevehicules="80"),
-        # D : outre-mer, à écarter
-        ligne_acc("202200000004", 2022, "971", "97101", "4"),
+def accidents_baac():
+    return {
+        # B : Paris, ancien format (« 750 » + « 012 »), piéton heurté par le cycliste
+        2010: [accident_baac("201000000002", "750", "012", "1", [("A01", "1", "0")],
+                             [("A01", "1", "3", "5"), ("A01", "3", "4", "0")]),
+               accident_baac("201000000099", "630", "001", "1", [("A01", "7", "0")], [("A01", "1", "4", "1")])],
+        # C : deux cyclistes (vélo + VAE), indemnes, motif et situation non renseignés
+        2019: [accident_baac("201900000003", "01", "01005", "0", [("A01", "1", "0"), ("B01", "80", "0")],
+                             [("A01", "1", "1", "0"), ("B01", "1", "1", "0")])],
         # E : ancienne commune fusionnée, gravité non renseignée, poids lourd, autre voie spéciale
-        ligne_acc("201500000005", 2015, "63", "63999", "-1", situ="6", typevehicules="14"),
-        # F : Corse
-        ligne_acc("202100000006", 2021, "2A", "2A004", "4", typevehicules="33"),
-    ]
-    page2 = [
+        2020: [accident_baac("202000000005", "63", "63999", "6", [("A01", "1", "0"), ("B01", "14", "0")],
+                             [("A01", "1", "-1", "5"), ("B01", "1", "1", "4")])],
+        # A : deux cyclistes, un tué, bus + voiture, sur piste ; F : Corse ; et un accident sans vélo
+        2021: [accident_baac("202100000001", "63", "63001", "5",
+                             [("A01", "1", "0"), ("B01", "1", "0"), ("C01", "7", "0"), ("D01", "18", "0")],
+                             [("A01", "1", "4", "1"), ("B01", "1", "2", "5"), ("C01", "1", "1", "1")]),
+               accident_baac("202100000006", "2A", "2A004", "1", [("A01", "1", "0"), ("B01", "33", "0")],
+                             [("A01", "1", "4", "5"), ("B01", "1", "4", "5")]),
+               accident_baac("202100000098", "63", "63001", "1", [("A01", "7", "0")], [("A01", "1", "3", "1")])],
+        # D : outre-mer, à écarter ; identifiant « Accident_Id » dans les caractéristiques (comme en 2022)
+        2022: [accident_baac("202200000004", "971", "97101", "1", [("A01", "1", "0")], [("A01", "1", "4", "5")])],
         # G : arrondissement de Lyon
-        ligne_acc("202300000007", 2023, "69", "69383", "4", typevehicules="7"),
-    ]
-    return ({"total": 8, "next": KOUMOUL_PAGE2, "results": page1},
-            {"total": 8, "results": page2})
+        2023: [accident_baac("202300000007", "69", "69383", "1", [("A01", "1", "0"), ("B01", "7", "0")],
+                             [("A01", "1", "4", "5"), ("B01", "1", "1", "1")])],
+    }
+
+
+def baac_fictif(d: Path, urls: dict) -> dict:
+    ressources, urls_annee = [], {}
+    for annee, accs in accidents_baac().items():
+        ancien = annee < 2019
+        entetes = ANCIEN if ancien else NOUVEAU
+        sep = ("\t" if annee == 2009 else ",") if ancien else ";"
+        lignes = {t: [] for t in entetes}
+        for a in accs:
+            ent_c = list(entetes["caract"])
+            if annee == 2022:
+                ent_c[0] = "Accident_Id"
+            ligne_c = {k: "" for k in ent_c}
+            ligne_c.update({ent_c[0]: a["num"], "dep": a["dep"], "com": a["com"]})
+            lignes["caract"].append([ligne_c[k] for k in ent_c])
+            lignes["lieux"].append([a["num"] if k == "Num_Acc" else a["situ"] if k == "situ" else "1"
+                                    for k in entetes["lieux"]])
+            for nv, catv, obsm in a["vehicules"]:
+                v = {"Num_Acc": a["num"], "num_veh": nv, "catv": catv, "obsm": obsm, "id_vehicule": "154 680 " + nv}
+                lignes["vehicules"].append([v.get(k, "0") for k in entetes["vehicules"]])
+            for nv, catu, grav, trajet in a["usagers"]:
+                u = {"Num_Acc": a["num"], "num_veh": nv, "catu": catu, "grav": grav, "trajet": trajet}
+                lignes["usagers"].append([u.get(k, "1") for k in entetes["usagers"]])
+        noms = {"caract": "caracteristiques" if ancien else ("carcteristiques" if annee == 2022 else "caract"),
+                "lieux": "lieux", "vehicules": "vehicules", "usagers": "usagers"}
+        for t, contenu in lignes.items():
+            ent = list(entetes[t])
+            if t == "caract" and annee == 2022:
+                ent[0] = "Accident_Id"
+            chemin = d / f"{noms[t]}-{annee}.csv"
+            with open(chemin, "w", encoding="cp1252" if ancien else "utf-8", newline="") as f:
+                csv.writer(f, delimiter=sep, quoting=csv.QUOTE_MINIMAL if ancien else csv.QUOTE_ALL).writerows([ent] + contenu)
+            url = f"https://static.data.gouv.fr/baac/{annee}/{noms[t]}-{annee}.csv"
+            urls[url] = chemin
+            urls_annee[(annee, t)] = url
+            ressources.append({"title": f"{noms[t].capitalize()}_{annee}.csv", "format": "csv", "url": url,
+                               "last_modified": "2025-10-21T11:59:00"})
+    # Fichiers à ignorer : véhicules immatriculés et documentation
+    ressources.append({"title": "vehicules-immatricule-baac-2021.csv", "format": "csv",
+                       "url": "https://static.data.gouv.fr/baac/2021/2021.csv"})
+    ressources.append({"title": "description-des-bases-de-donnees-annuelles.pdf", "format": "pdf",
+                       "url": "https://static.data.gouv.fr/baac/description.pdf"})
+    urls[baac.URL_API] = ecrire(d, "jeu-baac.json", {"last_modified": "2025-12-29T09:29:20", "resources": ressources})
+    return urls_annee
 
 
 def troncon(geom, **props):
@@ -300,10 +360,7 @@ def monde(tmp_path):
     urls[communes.URL_DELEGUEES] = ecrire(d, "deleguees.json", [
         {"code": "63999", "nom": "Ancienne commune", "chefLieu": "63001"},
         {"code": "63001", "nom": "Chef-lieu lui-même", "chefLieu": "63001"}])
-    p1, p2 = koumoul()
-    urls[accidents.URL_LIGNES] = ecrire(d, "koumoul1.json", p1)
-    urls[KOUMOUL_PAGE2] = ecrire(d, "koumoul2.json", p2)
-    urls[accidents.URL_JEU] = ecrire(d, "koumoul_meta.json", {"count": 8, "dataUpdatedAt": "2026-09-07T13:26:45Z"})
+    urls_baac = baac_fictif(d, urls)
     # 13 régions fictives ; le 63 et le 69 sont dans la même (84), comme en vrai
     regs = [{"code": f"R{i}", "nom": f"Région {i}"} for i in range(12)] + [{"code": "84", "nom": "Auvergne-Rhône-Alpes"}]
     deps_api = [{"code": c, "nom": f"Département {c}",
@@ -426,4 +483,4 @@ def monde(tmp_path):
         {"title": "Horaires bus", "type": "public-transit", "resources": [{"format": "GTFS", "url": "x"}]},
     ]
     urls[vls.URL_API_JEUX] = ecrire(d, "transport.json", jeux)
-    return {"urls": urls, "dossier": tmp_path}
+    return {"urls": urls, "dossier": tmp_path, "urls_baac": urls_baac}

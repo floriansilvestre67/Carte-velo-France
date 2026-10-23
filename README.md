@@ -37,7 +37,7 @@ Au bout de 5 à 15 minutes, le site est en ligne à l'adresse indiquée plus hau
 - Onglet **Actions** : chaque exécution affiche un tableau récapitulatif de l'état des sources.
 - Une coche rouge signifie que l'exécution a échoué. Le site reste alors en ligne avec ses données précédentes. Cliquez sur l'exécution pour lire le journal, en français.
 - Pour relancer à la main : **Actions > Données et déploiement > Run workflow**.
-- Les lieux à visiter (plus de 400 Mo de sources) ne sont recalculés qu'une fois par semaine. Pour forcer leur mise à jour, cochez « Recalculer les points d'intérêt » dans la fenêtre **Run workflow**.
+- Les fichiers d'accidents (environ 600 Mo) ne sont retraités que lorsqu'ils changent sur data.gouv.fr. Les lieux à visiter (plus de 400 Mo de sources) ne sont recalculés qu'une fois par semaine. Pour forcer leur mise à jour, cochez « Recalculer les points d'intérêt » dans la fenêtre **Run workflow**.
 
 ## Organisation du dépôt
 
@@ -54,7 +54,8 @@ scripts/
     regions.py            région de chaque département
     amenagements.py       aménagements cyclables (lecture en streaming)
     vls.py                vélos en libre-service (GBFS 1.x, 2.x, 3.x)
-    accidents.py          accidents de vélo (Koumoul / ONISR)
+    baac.py               fichiers officiels des accidents (BAAC, ONISR)
+    accidents.py          accidents de vélo : regroupement, codes, agrégats
     stationnement.py      stationnement vélo (indicateurs Ecolab, emplacements OSM)
     poi.py                lieux à visiter (DATAtourisme, Mérimée, Muséofile)
 tests/                    tests sur données fictives au format réel
@@ -82,7 +83,7 @@ site/
 | Population, surface, régions | [geo.api.gouv.fr](https://geo.api.gouv.fr) | Licence Ouverte |
 | Contours des départements | [gregoiredavid/france-geojson](https://github.com/gregoiredavid/france-geojson) | voir le dépôt |
 | Contours des communes | [Etalab, contours administratifs](https://etalab-datasets.geo.data.gouv.fr/contours-administratifs/latest/geojson/) | Licence Ouverte |
-| Accidents de vélo | [Koumoul « Accidents de vélo »](https://opendata.koumoul.com/datasets/accidents-velos), d'après les BAAC de l'ONISR | Licence Ouverte |
+| Accidents de vélo | [Fichiers BAAC de l'ONISR](https://www.data.gouv.fr/datasets/bases-de-donnees-annuelles-des-accidents-corporels-de-la-circulation-routiere-annees-de-2005-a-2024/) (ministère de l'Intérieur) | Licence Ouverte |
 | Stationnement (indicateurs) | [Ecolab, places de stationnement vélo](https://www.data.gouv.fr/datasets/nombre-de-places-de-stationnement-velo) et [places sécurisées](https://www.data.gouv.fr/datasets/nombre-de-places-de-stationnement-velo-securisees-type-accroche-cadre-et-roue-ou-cadre-pour-1000-hab) | ODbL |
 | Lieux à visiter | [DATAtourisme](https://www.data.gouv.fr/datasets/5b598be088ee387c0c353714), [Monuments historiques (Mérimée)](https://www.data.gouv.fr/datasets/immeubles-proteges-au-titre-des-monuments-historiques-2), [Musées de France (Muséofile)](https://www.data.gouv.fr/datasets/musees-de-france-base-museofile) | Licence Ouverte |
 | Stationnement (emplacements) | [Stationnements cyclables issus d'OpenStreetMap](https://www.data.gouv.fr/datasets/stationnements-cyclables-issus-dopenstreetmap) | ODbL |
