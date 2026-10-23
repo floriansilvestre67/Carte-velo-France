@@ -16,7 +16,8 @@
 
   var etat = {
     nat: null, annees: [], region: "", dep: "", ville: "", arr: "", debut: null, fin: null,
-    niveau: "dep", fichiers: {}, graphes: {}, tri: { cle: "parhab", sens: -1 }
+    niveau: "dep", fichiers: {}, graphes: {}, tri: { cle: "parhab", sens: -1 },
+    exclure: { 1: false, 2: false, 3: false }   // case « Exclure les valeurs extrêmes » de chaque nuage
   };
   var $ = function (id) { return document.getElementById(id); };
   var fmt0 = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 });
@@ -576,27 +577,126 @@
     return pts;
   }
 
-  function nuage(id, idCoef, pts, fx, fy, titreX, titreY) {
+  // Valeurs extrêmes : points dont la distance de Cook dépasse ce seuil, c'est-à-dire ceux qui,
+  // à eux seuls, déplacent fortement la droite de tendance (régression linéaire y = a + b·x).
+  var SEUIL_COOK = 0.5;
+
+  // Distance de Cook de chaque point pour la régression linéaire simple de y sur x.
+  // Renvoie null si le calcul est impossible (moins de 3 points, x ou y constants).
+  function distancesCook(x, y) {
+    var n = x.length; if (n < 3) return null;
+    var mx = somme(x) / n, my = somme(y) / n, sxx = 0, sxy = 0, i;
+    for (i = 0; i < n; i++) { sxx += (x[i] - mx) * (x[i] - mx); sxy += (x[i] - mx) * (y[i] - my); }
+    if (!sxx) return null;
+    var b = sxy / sxx, a = my - b * mx, residus = [], s2 = 0;
+    for (i = 0; i < n; i++) { residus.push(y[i] - a - b * x[i]); s2 += residus[i] * residus[i]; }
+    s2 /= n - 2;                                   // variance résiduelle (2 paramètres estimés)
+    if (!s2) return null;
+    return x.map(function (v, k) {
+      var h = 1 / n + (v - mx) * (v - mx) / sxx;   // effet de levier du point
+      return residus[k] * residus[k] / (2 * s2) * h / ((1 - h) * (1 - h));
+    });
+  }
+
+  // Liste de noms lisible : « Paris », « Paris et Toulouse », « Paris, Toulouse et Marseille »
+  function listeNoms(noms) {
+    return noms.length < 2 ? noms.join("") : noms.slice(0, -1).join(", ") + " et " + noms[noms.length - 1];
+  }
+
+  function texteCoef(x, y) {
+    var rp = pearson(x, y), rs = spearman(x, y);
+    return rp == null ? null : { rp: rp, rs: rs };
+  }
+
+  // Petit module Chart.js : écrit le nom des valeurs extrêmes à côté de leur point.
+  var etiquettesExtremes = {
+    id: "etiquettesExtremes",
+    afterDatasetsDraw: function (chart) {
+      var ctx = chart.ctx, zone = chart.chartArea;
+      ctx.save();
+      ctx.font = "700 12px 'Atkinson Hyperlegible', system-ui, sans-serif";
+      ctx.textBaseline = "middle";
+      chart.data.datasets.forEach(function (ds, d) {
+        var meta = chart.getDatasetMeta(d);
+        if (meta.hidden) return;
+        ds.data.forEach(function (p, i) {
+          if (!p.extreme) return;
+          var el = meta.data[i], largeur = ctx.measureText(p.nom).width;
+          // À droite du point, ou à gauche s'il est trop près du bord droit
+          var aGauche = el.x + 10 + largeur > zone.right;
+          ctx.textAlign = aGauche ? "right" : "left";
+          var tx = aGauche ? el.x - 10 : el.x + 10, ty = Math.max(zone.top + 7, el.y);
+          ctx.lineWidth = 3; ctx.strokeStyle = "rgba(255,255,255,0.9)";   // liseré blanc pour la lisibilité
+          ctx.strokeText(p.nom, tx, ty);
+          ctx.fillStyle = "#1f2a30";
+          ctx.fillText(p.nom, tx, ty);
+        });
+      });
+      ctx.restore();
+    }
+  };
+
+  // num : 1, 2 ou 3 (numéro du nuage, sert aux identifiants g-cN, coef-N, excl-N)
+  function nuage(num, pts, fx, fy, titreX, titreY) {
     var x = pts.map(fx), y = pts.map(fy);
+    var cook = distancesCook(x, y) || [];
+    var extreme = pts.map(function (p, i) { return cook[i] > SEUIL_COOK; });
+    var nomsExt = pts.filter(function (p, i) { return extreme[i]; })
+      .sort(function (a, b) { return cook[pts.indexOf(b)] - cook[pts.indexOf(a)]; })
+      .map(function (p) { return p.nom; });
+
+    // Case à cocher : désactivée quand aucun point n'est extrême
+    var caseExcl = $("excl-" + num), libelle = $("excl-lib-" + num);
+    caseExcl.disabled = !nomsExt.length;
+    caseExcl.checked = !!nomsExt.length && etat.exclure[num];
+    libelle.textContent = nomsExt.length ? "Exclure les valeurs extrêmes (" + listeNoms(nomsExt) + ")"
+      : "Aucune valeur extrême détectée";
+    var exclure = caseExcl.checked;
+
     // Les autres d'abord, la zone choisie ensuite : ses points sont dessinés par-dessus.
     var groupes = [
       { label: etat.niveau === "dep" ? "Autres départements" : "Autres communes", data: [], backgroundColor: "rgba(42, 120, 214, 0.55)", pointRadius: 4 },
       { label: "Zone sélectionnée", data: [], backgroundColor: C_SERIE2, pointRadius: 6 }
     ];
-    pts.forEach(function (p, i) { groupes[p.sel ? 1 : 0].data.push({ x: x[i], y: y[i], nom: p.nom }); });
-    var ds = groupes.filter(function (gr) { return gr.data.length; }).map(function (gr) {
-      return Object.assign(gr, { borderColor: "#ffffff", borderWidth: 1, pointHoverRadius: 8 });
+    pts.forEach(function (p, i) {
+      if (exclure && extreme[i]) return;
+      groupes[p.sel ? 1 : 0].data.push({ x: x[i], y: y[i], nom: p.nom, extreme: extreme[i] });
     });
-    graphe(id, { type: "scatter", data: { datasets: ds },
+    var ds = groupes.filter(function (gr) { return gr.data.length; }).map(function (gr) {
+      return Object.assign(gr, {
+        borderColor: function (c) { return c.raw && c.raw.extreme ? "#1f2a30" : "#ffffff"; },   // contour foncé = valeur extrême
+        borderWidth: function (c) { return c.raw && c.raw.extreme ? 2 : 1; },
+        pointHoverRadius: 8 });
+    });
+    graphe("g-c" + num, { type: "scatter", data: { datasets: ds }, plugins: [etiquettesExtremes],
       options: { plugins: { legend: { display: ds.length > 1 },
                             tooltip: { callbacks: { label: function (c) {
-                              return c.raw.nom + " : " + fmt1.format(c.raw.x) + " ; " + fmt1.format(c.raw.y); } } } },
+                              return c.raw.nom + " : " + fmt1.format(c.raw.x) + " ; " + fmt1.format(c.raw.y) +
+                                (c.raw.extreme ? " (valeur extrême)" : ""); } } } },
                  scales: { x: { title: { display: true, text: titreX }, grid: { color: C_GRILLE }, border: { display: false }, beginAtZero: true },
                            y: { title: { display: true, text: titreY }, grid: { color: C_GRILLE }, border: { display: false }, beginAtZero: true } } } });
-    var rp = pearson(x, y), rs = spearman(x, y);
-    $(idCoef).textContent = rp == null ? "Coefficients indisponibles (trop peu de points)."
-      : "Pearson r = " + fmt2.format(rp) + ", Spearman ρ = " + fmt2.format(rs) + " : corrélation " +
-        forceCorrelation(rs) + (rs > 0 ? ", positive" : rs < 0 ? ", négative" : "") + " (" + pts.length + " points).";
+
+    // Coefficients avec et sans les valeurs extrêmes : les deux sont toujours affichés
+    var garde = function (t) { return t.filter(function (v, i) { return !extreme[i]; }); };
+    var tous = texteCoef(x, y), sans = nomsExt.length ? texteCoef(garde(x), garde(y)) : null;
+    var nSans = pts.length - nomsExt.length;
+    var principal = exclure ? sans : tous, nPrincipal = exclure ? nSans : pts.length;
+    var txt;
+    if (!principal) {
+      txt = "Coefficients indisponibles (trop peu de points).";
+    } else {
+      txt = (exclure ? "Sans " + listeNoms(nomsExt) + " : " : "") +
+        "Pearson r = " + fmt2.format(principal.rp) + ", Spearman ρ = " + fmt2.format(principal.rs) + " : corrélation " +
+        forceCorrelation(principal.rs) + (principal.rs > 0 ? ", positive" : principal.rs < 0 ? ", négative" : "") +
+        " (" + nPrincipal + " points).";
+      var autre = exclure ? tous : sans;
+      if (autre) {
+        txt += (exclure ? " Avec toutes les valeurs : " : " Sans " + listeNoms(nomsExt) + " : ") +
+          "r = " + fmt2.format(autre.rp) + ", ρ = " + fmt2.format(autre.rs) + ".";
+      }
+    }
+    $("coef-" + num).textContent = txt;
+    return extreme;
   }
 
   function majCorrelations(zone) {
@@ -613,19 +713,23 @@
     if (pts.length < 10) {
       aide += " Trop peu de points (" + pts.length + ") pour calculer une corrélation fiable : choisissez une zone plus large.";
     }
-    $("aide-correl").textContent = aide;
+    $("aide-correl").textContent = aide + " Les valeurs extrêmes (contour foncé et nom affiché) sont les points qui, à eux seuls, " +
+      "déplacent fortement la droite de tendance ; chaque graphique permet de les exclure.";
+    var ext = [[], [], []];
     if (window.Chart) {
-      nuage("g-c1", "coef-1", pts, function (p) { return p.km; }, function (p) { return p.acc; },
+      ext[0] = nuage(1, pts, function (p) { return p.km; }, function (p) { return p.acc; },
         "Km d'aménagements cyclables", "Accidents par an");
-      nuage("g-c2", "coef-2", pts, function (p) { return p.pop; }, function (p) { return p.acc; },
+      ext[1] = nuage(2, pts, function (p) { return p.pop; }, function (p) { return p.acc; },
         "Habitants", "Accidents par an");
-      nuage("g-c3", "coef-3", pts, function (p) { return p.km / p.pop * 1e4; }, function (p) { return p.acc / p.pop * 1e5; },
+      ext[2] = nuage(3, pts, function (p) { return p.km / p.pop * 1e4; }, function (p) { return p.acc / p.pop * 1e5; },
         "Km pour 10 000 habitants", "Accidents pour 100 000 hab. par an");
     }
     $("d-correl").innerHTML = tableHTML(
-      ["Zone", "Accidents par an", "Population", "Km d'aménagements", "Km pour 10 000 hab.", "Accidents pour 100 000 hab. par an"],
-      pts.map(function (p) {
-        return [p.nom, fmt1.format(p.acc), p.pop, p.km, fmt1.format(p.km / p.pop * 1e4), fmt1.format(p.acc / p.pop * 1e5)];
+      ["Zone", "Accidents par an", "Population", "Km d'aménagements", "Km pour 10 000 hab.", "Accidents pour 100 000 hab. par an",
+       "Valeur extrême sur le graphique"],
+      pts.map(function (p, i) {
+        var sur = [1, 2, 3].filter(function (k) { return ext[k - 1][i]; }).join(", ");
+        return [p.nom, fmt1.format(p.acc), p.pop, p.km, fmt1.format(p.km / p.pop * 1e4), fmt1.format(p.acc / p.pop * 1e5), sur || "–"];
       }));
   }
 
@@ -668,6 +772,9 @@
     });
     $("niv-dep").addEventListener("click", function () { etat.niveau = "dep"; majCorrelations(etat.zone); });
     $("niv-com").addEventListener("click", function () { etat.niveau = "com"; majCorrelations(etat.zone); });
+    [1, 2, 3].forEach(function (k) {
+      $("excl-" + k).addEventListener("change", function (e) { etat.exclure[k] = e.target.checked; majCorrelations(etat.zone); });
+    });
     return rendre();
   }).catch(function (e) {
     if (window.console) console.error(e);

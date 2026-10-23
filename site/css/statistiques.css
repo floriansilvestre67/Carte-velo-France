@@ -64,6 +64,10 @@ figcaption { font-weight: 700; font-size: 0.95rem; margin-bottom: 6px; }
 .deux-blocs { display: grid; grid-template-columns: 1fr 1fr; gap: 0 32px; }
 .trois-graphes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
 .coef { font-size: 0.88rem; color: var(--encre-douce); margin: 6px 0 0; }
+.exclure { display: flex; align-items: flex-start; gap: 6px; font-size: 0.88rem; margin: 8px 0 0; cursor: pointer; }
+.exclure input { margin: 2px 0 0; width: 16px; height: 16px; accent-color: var(--vert-fonce); flex: none; }
+.exclure input:disabled + span { color: var(--encre-douce); }
+.exclure input:disabled { cursor: default; }
 .interpretation { max-width: 75ch; font-size: 0.95rem; margin: 16px 0 8px; }
 
 details { margin-top: 12px; }
