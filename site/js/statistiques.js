@@ -560,15 +560,17 @@
         pts.push({ nom: d.nom, acc: z ? somme(plage(z.acc)) / n : 0, pop: i.pop, km: i.km, sel: sel });
       });
     } else {
+      // Toujours toutes les communes de plus de 10 000 habitants de métropole ;
+      // celles de la zone choisie sont mises en avant (un département peut n'en compter qu'une).
       var g = nat.grandes_communes || {};
       var deps = zone.type === "R" ? zonesDe("D").filter(function (d) { return d.parent === zone.code; }).map(function (d) { return d.code; }) : null;
       Object.keys(g).forEach(function (c) {
         var v = g[c];
-        if (zone.type === "D" && v.d !== zone.code.slice(1)) return;
-        if (zone.type === "ville" && v.d !== depDeCommune(zone.code)) return;
-        if (deps && deps.indexOf(v.d) < 0) return;
         if (!v.p || v.km == null) return;
-        pts.push({ nom: v.n, acc: somme(plage(v.acc)) / n, pop: v.p, km: v.km, sel: c === etat.ville });
+        var sel = zone.type === "ville" ? c === zone.code
+          : zone.type === "D" ? v.d === zone.code.slice(1)
+          : zone.type === "R" ? deps.indexOf(v.d) >= 0 : false;
+        pts.push({ nom: v.n, acc: somme(plage(v.acc)) / n, pop: v.p, km: v.km, sel: sel });
       });
     }
     return pts;
@@ -576,11 +578,12 @@
 
   function nuage(id, idCoef, pts, fx, fy, titreX, titreY) {
     var x = pts.map(fx), y = pts.map(fy);
+    // Les autres d'abord, la zone choisie ensuite : ses points sont dessinés par-dessus.
     var groupes = [
-      { label: "Zone sélectionnée", data: [], backgroundColor: C_SERIE2, pointRadius: 6 },
-      { label: etat.niveau === "dep" ? "Autres départements" : "Autres communes", data: [], backgroundColor: "rgba(42, 120, 214, 0.55)", pointRadius: 4 }
+      { label: etat.niveau === "dep" ? "Autres départements" : "Autres communes", data: [], backgroundColor: "rgba(42, 120, 214, 0.55)", pointRadius: 4 },
+      { label: "Zone sélectionnée", data: [], backgroundColor: C_SERIE2, pointRadius: 6 }
     ];
-    pts.forEach(function (p, i) { groupes[p.sel ? 0 : 1].data.push({ x: x[i], y: y[i], nom: p.nom }); });
+    pts.forEach(function (p, i) { groupes[p.sel ? 1 : 0].data.push({ x: x[i], y: y[i], nom: p.nom }); });
     var ds = groupes.filter(function (gr) { return gr.data.length; }).map(function (gr) {
       return Object.assign(gr, { borderColor: "#ffffff", borderWidth: 1, pointHoverRadius: 8 });
     });
@@ -603,7 +606,8 @@
     var n = nbAnnees();
     var aide = (etat.niveau === "dep" ? "Les " + pts.length + " départements métropolitains" +
       (zone.type === "FR" ? "" : ", ceux de la zone choisie en orange") + ". " :
-      "Communes de plus de 10 000 habitants" + (zone.type === "FR" ? "" : " de la zone choisie") + ". ") +
+      "Les " + pts.length + " communes de plus de 10 000 habitants de métropole" +
+      (zone.type === "FR" ? "" : ", celles de la zone choisie en orange") + ". ") +
       "Accidents : moyenne par an sur " + (n > 1 ? n + " ans (" + etat.debut + "–" + etat.fin + ")" : etat.debut) +
       ". Population et km d'aménagements : valeurs actuelles.";
     if (pts.length < 10) {
