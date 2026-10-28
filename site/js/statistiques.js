@@ -812,7 +812,7 @@
       var pc = periodeCyclistes();
       ext[2] = nuage(3, pts, function (p) { return p.km; }, function (p) { return p.tc; },
         "Km d'aménagements cyclables",
-        "Accidents pour 1 000 cyclistes par an" + (pc ? " (" + (pc.debut === pc.fin ? pc.debut : pc.debut + "–" + pc.fin) + ")" : ""),
+        "Accidents pour 1 000 cyclistes par an",                      // la période est dans le titre
         pc ? "nombre de cyclistes indisponible ou nul" : "la période choisie se termine avant " + ((etat.nat.cyclistes_annees || [2017])[0]));
       $("cap-c3").textContent = "Accidents pour 1 000 cyclistes par an et km d'aménagements" +
         (pc ? " (" + (pc.debut === pc.fin ? pc.debut : pc.debut + "–" + pc.fin) + ")" : "");
