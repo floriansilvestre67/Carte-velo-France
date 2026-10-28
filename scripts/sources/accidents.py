@@ -220,5 +220,14 @@ def enregistrement(a: dict, correspondance=None) -> list:
 CHAMPS_ENREGISTREMENT = ["an", "com", "arr", "gravite", "vehicule", "trajet", "situ",
                          "tues", "hosp", "legers", "indemnes", "gravite_nr", "vae"]
 
-# Première année où les vélos à assistance électrique ont leur catégorie dans les fichiers BAAC
-ANNEE_VAE = 2018
+# Les fichiers BAAC prévoient une catégorie « VAE » (catv 80) ; en pratique, elle n'est utilisée
+# qu'à partir des fichiers 2019 (aucun VAE en 2018). L'année de départ est donc lue dans les données.
+
+
+def premiere_annee_vae(agg: dict) -> int | None:
+    """Première année où au moins un cycliste sur VAE est recensé (France métropolitaine)."""
+    fr = agg["zones"].get("FR") or {}
+    for an, v in zip(agg["annees"], fr.get("vae") or []):
+        if v[0] > 0:
+            return an
+    return None

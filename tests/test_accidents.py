@@ -131,7 +131,7 @@ def test_zones_et_regions(resultat):
     i2019 = national["annees"].index(2019)
     assert z["FR"]["vae"][i2019] == [1, 0, 0] and z["D01"]["vae"][i2019] == [1, 0, 0]
     assert z["FR"]["vae"][i2021] == [0, 0, 0]
-    assert national["vae_depuis"] == 2018 and "ruptures" not in national
+    assert national["vae_depuis"] == 2019 and "ruptures" not in national
 
 
 def test_communes_km_et_grandes_communes(resultat):

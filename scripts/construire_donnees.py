@@ -511,7 +511,7 @@ def ecrire_accidents_et_communes(client, sortie, url_precedent, sources_meta, de
         national = {"annees": annees,
                     "libelles": {"gravite": accidents.GRAVITES, "vehicule": accidents.VEHICULES,
                                  "trajet": accidents.TRAJETS, "situ": accidents.SITUATIONS},
-                    "vae_depuis": accidents.ANNEE_VAE, "zones": agg["zones"]}
+                    "vae_depuis": accidents.premiere_annee_vae(agg), "zones": agg["zones"]}
     else:
         national = fichier_precedent(client, url_precedent, "accidents/national.json")
         if national:
