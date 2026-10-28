@@ -810,12 +810,12 @@
       ext[1] = nuage(2, pts, function (p) { return p.pop; }, function (p) { return p.acc; },
         "Habitants", "Accidents par an");
       var pc = periodeCyclistes();
-      ext[2] = nuage(3, pts, function (p) { return p.km / p.pop * 1e4; }, function (p) { return p.tc; },
-        "Km pour 10 000 habitants",
+      ext[2] = nuage(3, pts, function (p) { return p.km; }, function (p) { return p.tc; },
+        "Km d'aménagements cyclables",
         "Accidents pour 1 000 cyclistes par an" + (pc ? " (" + (pc.debut === pc.fin ? pc.debut : pc.debut + "–" + pc.fin) + ")" : ""),
         pc ? "nombre de cyclistes indisponible ou nul" : "la période choisie se termine avant " + ((etat.nat.cyclistes_annees || [2017])[0]));
-      $("cap-c3").textContent = "Accidents pour 1 000 cyclistes (trajets domicile-travail" +
-        (pc ? ", " + (pc.debut === pc.fin ? pc.debut : pc.debut + "–" + pc.fin) : "") + ") et km pour 10 000 hab.";
+      $("cap-c3").textContent = "Accidents pour 1 000 cyclistes par an et km d'aménagements" +
+        (pc ? " (" + (pc.debut === pc.fin ? pc.debut : pc.debut + "–" + pc.fin) + ")" : "");
     }
     $("d-correl").innerHTML = tableHTML(
       ["Zone", "Accidents par an", "Population", "Km d'aménagements", "Km pour 10 000 hab.", "Accidents pour 100 000 hab. par an",
