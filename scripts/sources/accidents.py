@@ -49,17 +49,6 @@ SITUATIONS = ["Sur chaussée", "Sur piste cyclable", "Sur trottoir", "Sur accote
               "Sur bande d'arrêt d'urgence", "Sur autre voie spéciale", "Autre situation", "Non renseignée"]
 CODE_SITU = {"1": 0, "5": 1, "4": 2, "3": 3, "2": 4, "6": 5, "8": 6}
 
-# Ruptures de série affichées sur le site
-RUPTURES = [
-    {"annees": [2018, None], "texte": "Depuis 2018, les vélos à assistance électrique ont leur propre catégorie "
-     "dans les fichiers ; ils sont comptés ici avec les vélos classiques. La façon dont ils étaient enregistrés "
-     "avant 2018 n'est pas documentée : la comparaison avant et après 2018 demande un peu de prudence."},
-    {"annees": [2019, None], "texte": "Depuis 2019, l'ONISR ne labellise plus l'indicateur « blessé "
-     "hospitalisé » comme statistique publique : la donnée existe toujours mais doit être lue avec prudence."},
-    {"annees": [2019, None], "texte": "Les situations « autre voie spéciale » et « autre » n'existent que "
-     "depuis la refonte des fichiers en 2019. Avant 2019, le code 0 servait aussi pour « non renseigné »."},
-]
-
 
 def _txt(v) -> str:
     return "" if v is None else str(v).strip()
@@ -117,6 +106,7 @@ def construire_accidents(lignes, codes_valides: set[str], correspondance=None) -
         if a is None:
             a = par_acc[num] = {"an": an, "dep": dep, "com": com, "g": G_NR, "v": None, "t": 6, "s": 7,
                                 "tues": 0, "hosp": 0, "legers": 0, "indemnes": 0, "nr": 0,
+                                "vae": [0, 0, 0],   # cyclistes sur VAE : nombre, tués, hospitalisés
                                 "_vehs": set(), "_pieton": False, "_rang_t": 99}
             situ = CODE_SITU.get(_txt(l.get("situ")))
             if situ is not None:
@@ -125,6 +115,10 @@ def construire_accidents(lignes, codes_valides: set[str], correspondance=None) -
         rang = RANG_GRAV.get(grav, G_NR)
         cle = {G_MORTEL: "tues", G_GRAVE: "hosp", G_LEGER: "legers", G_INDEMNE: "indemnes"}.get(rang, "nr")
         a[cle] += 1
+        if _txt(l.get("vae")) == "1":
+            a["vae"][0] += 1
+            a["vae"][1] += cle == "tues"
+            a["vae"][2] += cle == "hosp"
         if rang < a["g"]:
             a["g"] = rang
         # Motif : celui du cycliste le plus gravement atteint (à défaut, le premier renseigné)
@@ -161,6 +155,7 @@ def construire_accidents(lignes, codes_valides: set[str], correspondance=None) -
 def zone_vide(n_annees: int) -> dict:
     z = lambda: [0] * n_annees  # noqa: E731
     return {"acc": z(), "tues": z(), "hosp": z(), "legers": z(), "indemnes": z(), "nr": z(),
+            "vae": [[0, 0, 0] for _ in range(n_annees)],
             "grav": [[0] * len(GRAVITES) for _ in range(n_annees)],
             "veh": [[[0] * len(GRAVITES) for _ in VEHICULES] for _ in range(n_annees)],
             "traj": [[0] * len(TRAJETS) for _ in range(n_annees)],
@@ -172,6 +167,8 @@ def ajouter(zone: dict, a: dict, i: int) -> None:
     for cle in ("tues", "hosp", "legers", "indemnes", "nr"):
         zone[cle][i] += a[cle]
     zone["grav"][i][a["g"]] += 1
+    for k, v in enumerate(a.get("vae") or (0, 0, 0)):
+        zone["vae"][i][k] += v
     zone["veh"][i][a["v"]][a["g"]] += 1
     zone["traj"][i][a["t"]] += 1
     zone["situ"][i][a["s"]][a["g"]] += 1
@@ -215,9 +212,13 @@ def enregistrement(a: dict, correspondance=None) -> list:
     """
     com = correspondance.resoudre(a["com"]) if correspondance else commune_entiere(a["com"])
     arr = a["com"] if a["com"] and commune_entiere(a["com"]) != a["com"] else ""
+    vae = a.get("vae") or [0, 0, 0]
     return [a["an"], com or "", arr, a["g"], a["v"], a["t"], a["s"],
-            a["tues"], a["hosp"], a["legers"], a["indemnes"], a["nr"]]
+            a["tues"], a["hosp"], a["legers"], a["indemnes"], a["nr"], vae if vae[0] else 0]
 
 
 CHAMPS_ENREGISTREMENT = ["an", "com", "arr", "gravite", "vehicule", "trajet", "situ",
-                         "tues", "hosp", "legers", "indemnes", "gravite_nr"]
+                         "tues", "hosp", "legers", "indemnes", "gravite_nr", "vae"]
+
+# Première année où les vélos à assistance électrique ont leur catégorie dans les fichiers BAAC
+ANNEE_VAE = 2018

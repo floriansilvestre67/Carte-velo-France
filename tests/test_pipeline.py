@@ -174,3 +174,17 @@ def test_regions_indisponibles(monde):
     assert meta["sources"]["regions"]["statut"] == "indisponible"
     assert props["63"]["region"] is None
     assert props["63"]["score"] is not None   # le reste n'est pas affecté
+
+
+def test_classement_communes(monde):
+    _, _, _, sortie = lancer(monde)
+    c = json.loads((sortie / "classement-communes.json").read_text(encoding="utf-8"))
+    lignes = [dict(zip(c["champs"], l)) for l in c["lignes"]]
+    assert c["seuil_population"] == 10_000
+    assert all(l["pop"] >= 10_000 for l in lignes)
+    paris = next(l for l in lignes if l["code"] == "75056")
+    assert paris["nom"] == "Paris" and paris["dep"] == "75"
+    scores = [l["score"] for l in lignes if l["score"] is not None]
+    assert scores and all(0 <= s <= 100 for s in scores)
+    l63 = next(l for l in lignes if l["code"] == "63012")
+    assert l63["km_10k_hab"] == pytest.approx(l63["km_total"] / l63["pop"] * 1e4, rel=1e-3)

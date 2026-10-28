@@ -80,6 +80,17 @@
       <details><summary>Voir les données</summary><div class="table-defile" id="d-evolution"></div></details>
     </section>
 
+    <section class="bloc" aria-labelledby="t-vae" id="bloc-vae">
+      <h2 id="t-vae">Vélo électrique ou vélo classique</h2>
+      <p class="aide" id="aide-vae"></p>
+      <figure>
+        <div class="cadre-graphe bas"><canvas id="g-vae" role="img" aria-label="Cyclistes accidentés par année, sur vélo classique et sur vélo à assistance électrique"></canvas></div>
+      </figure>
+      <p class="resume" id="resume-vae"></p>
+      <p class="aide">Ces chiffres comptent des cyclistes accidentés, pas un risque : on ne sait ni combien de vélos électriques circulent, ni quelles distances ils parcourent. Si les vélos électriques sont de plus en plus nombreux parmi les accidentés, c'est d'abord parce qu'ils sont de plus en plus nombreux sur les routes.</p>
+      <details><summary>Voir les données</summary><div class="table-defile" id="d-vae"></div></details>
+    </section>
+
     <section class="bloc" aria-labelledby="t-vehicules">
       <h2 id="t-vehicules">Avec quoi les cyclistes entrent en collision</h2>
       <p class="aide">Nombre d'accidents selon l'autre usager impliqué et la gravité pour le cycliste. Quand plusieurs véhicules sont en cause, c'est le plus lourd qui est retenu.</p>
@@ -92,7 +103,7 @@
     <div class="deux-blocs">
       <section class="bloc" aria-labelledby="t-motifs">
         <h2 id="t-motifs">Motif du déplacement</h2>
-        <p class="aide">Motif déclaré du cycliste le plus gravement atteint.</p>
+        <p class="aide">Motif déclaré du cycliste le plus gravement atteint, quand il est renseigné.</p>
         <figure>
           <div class="cadre-graphe"><canvas id="g-motifs" role="img" aria-label="Nombre d'accidents par motif de déplacement"></canvas></div>
         </figure>
@@ -101,7 +112,7 @@
 
       <section class="bloc" aria-labelledby="t-situ">
         <h2 id="t-situ">Où a lieu l'accident</h2>
-        <p class="aide">Situation de l'accident, par gravité pour le cycliste.</p>
+        <p class="aide">Situation de l'accident, par gravité pour le cycliste, quand elle est renseignée.</p>
         <figure>
           <div class="cadre-graphe"><canvas id="g-situ" role="img" aria-label="Accidents par situation, empilés par gravité"></canvas></div>
         </figure>

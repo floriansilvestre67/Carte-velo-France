@@ -288,7 +288,7 @@ def construire(client, sortie: Path, travail: Path, url_precedent: str | None = 
         sources_meta["stationnement_osm"] = {"statut": "indisponible", "detail": f"Source injoignable : {e}"}
 
     # 4 ter. Points d'intérêt
-    journal("   Points d'intérêt (DATAtourisme, Mérimée, Muséofile)…")
+    journal("   Points d'intérêt (DATAtourisme, Mérimée, Muséofile, jardins remarquables, Wikidata)…")
     poi_par_dep = None
     ancien_poi = ((precedent or {}).get("meta", {}).get("sources") or {}).get("poi") or {}
     age = None
@@ -313,7 +313,10 @@ def construire(client, sortie: Path, travail: Path, url_precedent: str | None = 
                           + (" ; sources en échec : " + ", ".join(res_p["erreurs"]) if res_p["erreurs"] else ""),
                 "comptes": res_p["comptes"], "classes_gardees": st.get("classes_gardees"),
                 "diagnostic": {"merimee_lignes": st.get("merimee_lignes"), "museofile_lignes": st.get("museofile_lignes"),
-                               "fichiers": st.get("fichiers")},
+                               "jardins_lignes": st.get("jardins_lignes"), "fichiers": st.get("fichiers"),
+                               "wikidata_references": st.get("wikidata_references"),
+                               "avant_selection": st.get("avant_selection"),
+                               "monuments_par_seuil": st.get("monuments_par_seuil")},
                 "classes_ecartees": st.get("classes_ecartees")}
             journal(f"  {sources_meta['poi']['detail']} {res_p['comptes']}")
         except Exception as e:
@@ -418,7 +421,8 @@ def accidents_publies(client, url_precedent, codes) -> list[dict] | None:
             accs.append({"an": k["an"], "dep": dep, "com": k.get("arr") or k.get("com") or None,
                          "g": k["gravite"], "v": k["vehicule"], "t": k["trajet"], "s": k["situ"],
                          "tues": k["tues"], "hosp": k["hosp"], "legers": k["legers"],
-                         "indemnes": k["indemnes"], "nr": k["gravite_nr"]})
+                         "indemnes": k["indemnes"], "nr": k["gravite_nr"],
+                         "vae": k.get("vae") or [0, 0, 0]})
     return accs or None
 
 
@@ -505,7 +509,7 @@ def ecrire_accidents_et_communes(client, sortie, url_precedent, sources_meta, de
         national = {"annees": annees,
                     "libelles": {"gravite": accidents.GRAVITES, "vehicule": accidents.VEHICULES,
                                  "trajet": accidents.TRAJETS, "situ": accidents.SITUATIONS},
-                    "ruptures": accidents.RUPTURES, "zones": agg["zones"]}
+                    "vae_depuis": accidents.ANNEE_VAE, "zones": agg["zones"]}
     else:
         national = fichier_precedent(client, url_precedent, "accidents/national.json")
         if national:
@@ -518,6 +522,7 @@ def ecrire_accidents_et_communes(client, sortie, url_precedent, sources_meta, de
 
     # --- Fichiers par département ---
     total = 0
+    toutes_fiches: dict[str, dict] = {}            # pour le classement national des communes
     for dep in codes:
         communes_dep = par_dep[dep]
         ancien = None
@@ -564,10 +569,16 @@ def ecrire_accidents_et_communes(client, sortie, url_precedent, sources_meta, de
             lignes = [accidents.enregistrement(a, correspondance) for a in accs if a["dep"] == dep]
         else:
             lignes = ((precedent_dep(dep).get("accidents") or {}).get("lignes")) or []
+        for code_com, fiche in communes_dep.items():
+            toutes_fiches[code_com] = {**fiche, "d": dep}
         contenu = {"dep": dep, "communes": communes_dep,
                    "accidents": {"champs": accidents.CHAMPS_ENREGISTREMENT, "lignes": lignes}}
         total += ecrire_json(sortie / "communes" / f"{dep}.json", contenu)
     journal(f"  → communes/*.json ({total / 1024:.0f} Ko au total)")
+    if toutes_fiches:
+        classement = indicateurs.calculer_communes(toutes_fiches, SEUIL_GRANDES_COMMUNES)
+        taille = ecrire_json(sortie / "classement-communes.json", classement)
+        journal(f"  → classement-communes.json ({len(classement['lignes'])} communes, {taille / 1024:.0f} Ko)")
 
     if not national:
         return

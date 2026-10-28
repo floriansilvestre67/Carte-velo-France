@@ -154,6 +154,10 @@
     var p = feature.properties;
     var choisi = p.code === etat.selection;
     var opacite = opaciteAplat();
+    if (etat.ville) {
+      // Ville recherchée : plus d'aplat en dehors d'elle, seulement des limites discrètes pour se repérer
+      return { fillOpacity: 0, color: "#55636a", weight: 0.6, opacity: 0.35 };
+    }
     if (!dansRegion(p)) {
       // Hors de la région filtrée : en retrait, mais toujours cliquable
       return { fillColor: couleur(p[etat.indicateur]), fillOpacity: opacite * 0.18,
@@ -181,7 +185,7 @@
         couche.bindTooltip(function () { return texteInfobulle(feature.properties); },
           { sticky: true, className: "info-dep", direction: "top", offset: [0, -8] });
         couche.on({
-          mouseover: function () { if (feature.properties.code !== etat.selection) couche.setStyle({ weight: 2, color: "#1f2a2e" }); },
+          mouseover: function () { if (!etat.ville && feature.properties.code !== etat.selection) couche.setStyle({ weight: 2, color: "#1f2a2e" }); },
           mouseout: function () { couche.setStyle(styleDep(feature)); },
           click: function () { choisirDepartement(feature.properties.code, false); }
         });
@@ -235,6 +239,11 @@
   function recolorer() {
     etat.calqueDeps.setStyle(styleDep);
     if (etat.selection && etat.couches[etat.selection]) etat.couches[etat.selection].bringToFront();
+    if (etat.calqueVille && etat.ville) {           // la ville suit l'indicateur choisi
+      var p = proprietes().find(function (q) { return q.code === RechercheVille.departement(etat.ville); });
+      etat.calqueVille.setStyle({ fillColor: p ? couleur(p[etat.indicateur]) : "#ffffff" });
+      etat.calqueVille.bringToFront();
+    }
   }
 
   // ---------------------------------------------------------------- légende
@@ -267,39 +276,87 @@
 
   // ---------------------------------------------------------------- classement
 
+  // Classement des communes de plus de 10 000 habitants (fichier national léger, chargé à la demande)
+  var classementCommunes = null;
+  function chargerClassementCommunes() {
+    if (!classementCommunes) {
+      classementCommunes = fetch("data/classement-communes.json").then(function (r) {
+        if (!r.ok) throw new Error("classement-communes"); return r.json();
+      }).then(function (c) {
+        return c.lignes.map(function (l) { var o = {}; c.champs.forEach(function (k, i) { o[k] = l[i]; }); o.seuil = c.seuil_population; return o; });
+      }).catch(function () { classementCommunes = null; return null; });
+    }
+    return classementCommunes;
+  }
+
+  function ligneClassement(rang, nom, valeur, cle, max, auClic) {
+    var li = document.createElement("li");
+    var b = document.createElement("button");
+    b.type = "button";
+    var largeur = max > 0 ? Math.max(2, valeur / max * 100) : 0;
+    b.innerHTML = '<span class="rang">' + ordinal(rang) + "</span>" +
+      '<span class="nom">' + echapper(nom) + "</span>" +
+      "<span>" + echapper(formater(valeur, cle)) + "</span>" +
+      '<span class="barre" aria-hidden="true" style="width:' + (largeur * 0.62).toFixed(1) + '%"></span>';
+    b.setAttribute("aria-label", ordinal(rang) + " : " + nom + ", " + avecUnite(valeur, cle));
+    b.addEventListener("click", auClic);
+    li.appendChild(b);
+    return li;
+  }
+
   function majClassement() {
     var cle = etat.indicateur, ind = indicateur(cle);
+    var ol = $("classement"), note = $("classement-note");
+    var lieu = etat.region ? " en " + nomRegion(etat.region) : "";
+    note.hidden = true;
+    $("onglet-haut").textContent = etat.region ? "Départements" : "10 premiers départements";
+    if (etat.partie === "bas") {
+      // Onglet « communes » : les 10 premières communes de plus de 10 000 habitants (de la région choisie)
+      $("classement-titre").textContent = "Communes" + lieu + " : " + ind.libelle.toLowerCase();
+      ol.innerHTML = '<li class="indispo">Chargement…</li>';
+      var demande = cle + "|" + etat.region;
+      chargerClassementCommunes().then(function (communes) {
+        if (etat.partie !== "bas" || demande !== etat.indicateur + "|" + etat.region) return;   // choix changé entre-temps
+        ol.innerHTML = "";
+        if (!communes) { ol.innerHTML = '<li class="indispo">Classement des communes indisponible pour le moment.</li>'; return; }
+        if (!(cle in communes[0])) {
+          ol.innerHTML = '<li class="indispo">Cet indicateur n\'existe qu\'à l\'échelle des départements.</li>';
+          return;
+        }
+        var deps = etat.region ? proprietes().filter(dansRegion).map(function (p) { return p.code; }) : null;
+        // Une valeur nulle (aucun vélo, aucune place…) ne mérite pas une place dans « les premières »
+        var liste = communes.filter(function (c) { return c[cle] != null && (cle === "score" || c[cle] > 0) && (!deps || deps.indexOf(c.dep) >= 0); })
+          .sort(function (a, b) { return b[cle] - a[cle]; });
+        var max = liste.length ? liste[0][cle] : 0;
+        liste.slice(0, 10).forEach(function (c) {
+          var rang = 1 + liste.filter(function (q) { return q[cle] > c[cle]; }).length;
+          ol.appendChild(ligneClassement(rang, c.nom + " (" + c.dep + ")", c[cle], cle, max,
+            function () { choisirVille(c.code, null, true); }));
+        });
+        if (!liste.length) ol.innerHTML = '<li class="indispo">Donnée indisponible : le classement ne peut pas être établi.</li>';
+        note.textContent = "Parmi les " + liste.length + " communes de plus de " +
+          new Intl.NumberFormat("fr-FR").format(communes[0].seuil) + " habitants" + lieu +
+          (cle === "score" ? " ; score calculé entre ces communes." : ".");
+        note.hidden = false;
+      });
+      return;
+    }
     var liste = proprietes().filter(function (p) { return p[cle] != null && dansRegion(p); })
       .sort(function (a, b) { return b[cle] - a[cle]; });
-    // Une région compte au plus 13 départements : on les montre tous, sans onglets.
-    var extrait = etat.region ? liste
-      : etat.partie === "haut" ? liste.slice(0, 10) : liste.slice(-10).reverse();
+    // Une région compte au plus 13 départements : on les montre tous.
+    var extrait = etat.region ? liste : liste.slice(0, 10);
     var max = liste.length ? liste[0][cle] : 0;
-    $("classement-titre").textContent = (etat.region ? "Classement en " + nomRegion(etat.region) : "Classement") +
-      " : " + ind.libelle.toLowerCase();
-    document.querySelector(".onglets").hidden = !!etat.region;
+    $("classement-titre").textContent = (etat.region ? "Classement" + lieu : "Classement") + " : " + ind.libelle.toLowerCase();
     var rangDe = function (p) {
       return etat.region ? 1 + liste.filter(function (q) { return q[cle] > p[cle]; }).length : p.rangs[cle];
     };
-    var ol = $("classement");
     ol.innerHTML = "";
     if (!extrait.length) {
       ol.innerHTML = '<li class="indispo">Donnée indisponible : le classement ne peut pas être établi.</li>';
       return;
     }
     extrait.forEach(function (p) {
-      var li = document.createElement("li");
-      var b = document.createElement("button");
-      b.type = "button";
-      var largeur = max > 0 ? Math.max(2, p[cle] / max * 100) : 0;
-      b.innerHTML = '<span class="rang">' + ordinal(rangDe(p)) + "</span>" +
-        '<span class="nom">' + echapper(p.nom) + "</span>" +
-        "<span>" + echapper(formater(p[cle], cle)) + "</span>" +
-        '<span class="barre" aria-hidden="true" style="width:' + (largeur * 0.62).toFixed(1) + '%"></span>';
-      b.setAttribute("aria-label", ordinal(rangDe(p)) + " : " + p.nom + ", " + avecUnite(p[cle], cle));
-      b.addEventListener("click", function () { choisirDepartement(p.code, true); });
-      li.appendChild(b);
-      ol.appendChild(li);
+      ol.appendChild(ligneClassement(rangDe(p), p.nom, p[cle], cle, max, function () { choisirDepartement(p.code, true); }));
     });
   }
 
@@ -520,6 +577,7 @@
     if (!etat.ville) {
       $("fiche-ville").hidden = true;
       rechercheVille.afficher("");
+      recolorer();
       majFiche();
       majAdresse();
       return;
@@ -546,8 +604,11 @@
         rechercheVille.afficher(c.n || code);
         var forme = contours && contours.features.find(function (x) { return x.properties.code === code; });
         if (forme) {
+          // Seule la ville garde la couleur de l'indicateur (celle de son département), détourée en trait gras
+          var pVille = proprietes().find(function (q) { return q.code === dep; });
           etat.calqueVille = L.geoJSON(forme, { interactive: false,
-            style: { color: "#1f2a2e", weight: 3, fill: true, fillColor: "#ffffff", fillOpacity: 0.12 } }).addTo(carte);
+            style: { color: "#1f2a2e", weight: 4, fill: true,
+                     fillColor: pVille ? couleur(pVille[etat.indicateur]) : "#ffffff", fillOpacity: 0.35 } }).addTo(carte);
           if (recentrer !== false) centrerSur(etat.calqueVille.getBounds(), 13);
         }
         dessinerFicheVille(f, code, forme);
@@ -863,7 +924,7 @@
     if (!etat.calquePoi) {
       etat.calquePoi = L.markerClusterGroup({
         chunkedLoading: true, showCoverageOnHover: false, maxClusterRadius: 50, disableClusteringAtZoom: 16,
-        attribution: "Lieux : DATAtourisme, Ministère de la Culture (Mérimée, Muséofile)",
+        attribution: "Lieux : DATAtourisme, Ministère de la Culture (Mérimée, Muséofile, jardins remarquables), Wikidata",
         iconCreateFunction: function (c) {
           var n = c.getChildCount(), taille = n < 100 ? 30 : n < 1000 ? 38 : 46;
           return L.divIcon({ html: "<span>" + n + "</span>", className: "cluster-poi", iconSize: [taille, taille] });

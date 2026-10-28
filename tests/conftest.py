@@ -151,12 +151,16 @@ def poi_fictifs(d: Path, urls: dict) -> None:
              l("Musée d'art Roger-Quilliot", ["CulturalSite", "Museum"], lat, lon, "u1", "Un musée, avec, des virgules"),
              l("Hôtel du Centre", ["Accommodation", "Hotel"], lat, lon, "u2"),
              l("Église Notre-Dame", ["CulturalSite", "ReligiousSite", "Church"], lat + 0.01, lon, "u3"),
-             l("Jardin Lecoq", ["ParkAndGarden"], lat + 0.02, lon, "u4"),
-             l("Plage du lac", ["NaturalHeritage", "Beach"], lat + 0.03, lon, "u5"),
+             l("Jardin Lecoq", ["ParkAndGarden"], lat + 0.02, lon, "u4", "Une description assez longue pour être utile aux visiteurs, qui dépasse quatre-vingts caractères sans peine."),
+             l("Square Martin", ["ParkAndGarden"], lat + 0.05, lon, "u8", "Une description assez longue pour être utile aux visiteurs, qui dépasse quatre-vingts caractères sans peine."),            # sans label : écarté
+             l("Plage du lac", ["NaturalHeritage", "Beach"], lat + 0.03, lon, "u5", "Une description assez longue pour être utile aux visiteurs, qui dépasse quatre-vingts caractères sans peine."),
+             l("Mare du bois", ["NaturalHeritage"], lat + 0.06, lon, "u9"),                   # sans description
+             l("Lavoir", ["CulturalSite", "CityHeritage"], lat + 0.07, lon, "u10", "Une description assez longue pour être utile aux visiteurs, qui dépasse quatre-vingts caractères sans peine."),    # non protégé
+             l("Petit musée", ["CulturalSite", "Museum"], lat + 0.08, lon, "u11", "Une description assez longue pour être utile aux visiteurs, qui dépasse quatre-vingts caractères sans peine."),     # pas musée de France
              l("Médiathèque", ["CulturalSite", "Library"], lat, lon + 0.01, "u6"),
              l("Site de La Réunion", ["CulturalSite"], -21.1, 55.5, "u7"),
              l("Musée d'art Roger-Quilliot", ["CulturalSite", "Museum"], lat, lon, "u1")]          # doublon d'URI
-    tour = [entete, l("Boucle des volcans à vélo", ["Tour", "CyclingTour"], lat - 0.01, lon, "t1"),
+    tour = [entete, l("Boucle des volcans à vélo", ["Tour", "CyclingTour"], lat - 0.01, lon, "t1", "Une description assez longue pour être utile aux visiteurs, qui dépasse quatre-vingts caractères sans peine."),
             l("Sentier pédestre", ["Tour", "WalkingTour"], lat - 0.02, lon, "t2")]
     product = [entete, l("Location de vélos du lac", ["Product", "Rental", "EquipmentRental"], lat - 0.03, lon, "p1"),
                l("Location de kayaks", ["Product", "Rental", "EquipmentRental"], lat - 0.03, lon + 0.01, "p2")]
@@ -193,6 +197,21 @@ def poi_fictifs(d: Path, urls: dict) -> None:
     urls["https://culture.example/museofile.csv"] = chemin
     urls[poi.URL_API.format(poi.ID_MUSEOFILE)] = ecrire(d, "jeu-musees.json", {"resources": [
         {"title": "museofile.csv", "format": "csv", "url": "https://culture.example/museofile.csv"}]})
+
+    # Jardins remarquables : « Jardin Lecoq » rejoint la fiche DATAtourisme ; un autre est seul
+    jardins = [["Nom du jardin", "Commune", "Coordonnées géographiques", "Site internet", "Description"],
+               ["Jardin Lecoq", "Clermont-Ferrand", f"{lat + 0.0203}, {lon}", "", ""],
+               ["Jardin de la Source", "Royat", f"{lat - 0.05}, {lon}", "jardin.example", "Jardin en terrasses."]]
+    chemin = d / "jardins.csv"
+    with open(chemin, "w", encoding="utf-8", newline="") as f:
+        csv.writer(f, delimiter=";").writerows(jardins)
+    urls["https://culture.example/jardins.csv"] = chemin
+    urls[poi.URL_API.format(poi.ID_JARDINS)] = ecrire(d, "jeu-jardins.json", {"resources": [
+        {"title": "jardins.csv", "format": "csv", "url": "https://culture.example/jardins.csv"}]})
+    # Notoriété Wikidata : l'église est connue (12 pages), la halle peu (2 pages)
+    urls[poi.URL_WIKIDATA] = ecrire(d, "wikidata.json", {"results": {"bindings": [
+        {"ref": {"value": "PA001"}, "s": {"value": "12"}},
+        {"ref": {"value": "PA002"}, "s": {"value": "2"}}]}})
 
 
 def liste_communes():

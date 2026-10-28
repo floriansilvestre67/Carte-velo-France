@@ -56,7 +56,7 @@
     };
     var ng = lib.gravite.length;
     var z = { acc: vide(), tues: vide(), hosp: vide(), legers: vide(), indemnes: vide(), nr: vide(),
-              grav: matrice(ng), veh: matrice(lib.vehicule.length, ng), traj: matrice(lib.trajet.length),
+              vae: matrice(3), grav: matrice(ng), veh: matrice(lib.vehicule.length, ng), traj: matrice(lib.trajet.length),
               situ: matrice(lib.situ.length, ng) };
     var k = {}; champs.forEach(function (c, i) { k[c] = i; });
     lignes.forEach(function (l) {
@@ -66,6 +66,8 @@
       z.acc[i]++; z.tues[i] += l[k.tues]; z.hosp[i] += l[k.hosp]; z.legers[i] += l[k.legers];
       z.indemnes[i] += l[k.indemnes]; z.nr[i] += l[k.gravite_nr];
       z.grav[i][g]++; z.veh[i][l[k.vehicule]][g]++; z.traj[i][l[k.trajet]]++; z.situ[i][l[k.situ]][g]++;
+      var v = k.vae != null ? l[k.vae] : 0;          // 0, ou [cyclistes sur VAE, dont tués, dont hospitalisés]
+      if (v) { z.vae[i][0] += v[0]; z.vae[i][1] += v[1]; z.vae[i][2] += v[2]; }
     });
     return z;
   }
@@ -217,6 +219,7 @@
         majMotifs(zone);
         majSituations(zone);
         majPiste(zone);
+        majVae(zone);
       }
       return majRatios(zone).then(function () { return majCorrelations(zone); });
     }).catch(function (e) {
@@ -234,12 +237,6 @@
         " accident" + (total > 1 ? "s" : "") + " sur la période : les chiffres sont affichés, mais ils varient beaucoup " +
         "d'une année à l'autre. Élargissez la période ou la zone avant d'en tirer une conclusion.</div>";
     }
-    (etat.nat.ruptures || []).forEach(function (r) {
-      var debut = r.annees[0], fin = r.annees[1] || 9999;
-      if (etat.fin >= debut && etat.debut <= fin) {
-        html += '<div class="alerte"><strong>Rupture de série à partir de ' + debut + "</strong>" + echapper(r.texte) + "</div>";
-      }
-    });
     if (!window.Chart) {
       html += '<div class="alerte"><strong>Graphiques indisponibles</strong>La bibliothèque de graphiques n\'a pas pu être chargée. Les tableaux de données restent consultables.</div>';
     }
@@ -281,26 +278,6 @@
     };
   })();
 
-  /* Bande grisée sur les années de série incomplète (2018 et après), avec une mention. */
-  var bandeRupture = {
-    id: "bandeRupture",
-    beforeDatasetsDraw: function (chart, args, opts) {
-      if (!opts || !opts.depuis) return;
-      var x = chart.scales.x, labels = chart.data.labels, i = labels.indexOf(opts.depuis);
-      if (i < 0) { if (labels[0] > opts.depuis) i = 0; else return; }
-      var ca = chart.chartArea, ctx = chart.ctx;
-      var gauche = i === 0 ? ca.left : (x.getPixelForValue(i - 1) + x.getPixelForValue(i)) / 2;
-      ctx.save();
-      ctx.fillStyle = "rgba(85, 99, 106, 0.08)";
-      ctx.fillRect(gauche, ca.top, ca.right - gauche, ca.bottom - ca.top);
-      ctx.fillStyle = C_TEXTE;
-      ctx.font = "12px " + Chart.defaults.font.family;
-      ctx.textAlign = "right";
-      ctx.fillText("Série incomplète", ca.right - 4, ca.top + 12);
-      ctx.restore();
-    }
-  };
-
   function graphe(id, config) {
     if (etat.graphes[id]) etat.graphes[id].destroy();
     etat.graphes[id] = new Chart($(id), config);
@@ -341,13 +318,13 @@
       return { label: label, data: data, borderColor: c, backgroundColor: c, borderWidth: 2,
                pointRadius: rayon, pointHoverRadius: 7, tension: 0 };
     };
-    var opts = { plugins: { bandeRupture: { depuis: 2018 }, tooltip: { mode: "index", intersect: false } },
+    var opts = { plugins: { tooltip: { mode: "index", intersect: false } },
                  interaction: { mode: "index", intersect: false }, scales: axes() };
-    graphe("g-evolution", { type: "line", plugins: [bandeRupture],
+    graphe("g-evolution", { type: "line",
       data: { labels: lab, datasets: [ligne("Accidents", tranche(z.acc), C_SERIE1),
                                       ligne("Cyclistes blessés", tranche(blesses), C_SERIE2)] },
       options: opts });
-    graphe("g-tues", { type: "line", plugins: [bandeRupture],
+    graphe("g-tues", { type: "line",
       data: { labels: lab, datasets: [ligne("Cyclistes tués", tranche(z.tues), C_SERIE1)] },
       options: Object.assign({}, opts, { plugins: Object.assign({}, opts.plugins, { legend: { display: false } }) }) });
     $("d-evolution").innerHTML = tableHTML(
@@ -364,10 +341,13 @@
     return res;
   }
 
-  function barresEmpilees(id, libelles, m, idTable, titreCol) {
+  // Catégorie « non renseigné(e) » : retirée des graphiques de motifs et de situations
+  function nonRenseigne(libelle) { return /^non renseign/i.test(libelle || ""); }
+
+  function barresEmpilees(id, libelles, m, idTable, titreCol, sansNonRenseigne) {
     var lib = etat.nat.libelles;
     var ordre = libelles.map(function (_, i) { return i; })
-      .filter(function (i) { return somme(m[i]) > 0; })
+      .filter(function (i) { return somme(m[i]) > 0 && !(sansNonRenseigne && nonRenseigne(libelles[i])); })
       .sort(function (a, b) { return somme(m[b]) - somme(m[a]); });
     var datasets = lib.gravite.map(function (g, gi) {
       return { label: g, data: ordre.map(function (i) { return m[i][gi]; }), backgroundColor: C_GRAV[gi],
@@ -388,13 +368,13 @@
   }
 
   function majSituations(zone) {
-    barresEmpilees("g-situ", etat.nat.libelles.situ, sommeMatrice(zone.z.situ), "d-situ", "Situation");
+    barresEmpilees("g-situ", etat.nat.libelles.situ, sommeMatrice(zone.z.situ), "d-situ", "Situation", true);
   }
 
   function majMotifs(zone) {
     var lib = etat.nat.libelles.trajet;
     var tot = lib.map(function (_, t) { return somme(plage(zone.z.traj).map(function (an) { return an[t]; })); });
-    var ordre = tot.map(function (_, i) { return i; }).filter(function (i) { return tot[i] > 0; })
+    var ordre = tot.map(function (_, i) { return i; }).filter(function (i) { return tot[i] > 0 && !nonRenseigne(lib[i]); })
       .sort(function (a, b) { return tot[b] - tot[a]; });
     graphe("g-motifs", { type: "bar",
       data: { labels: ordre.map(function (i) { return lib[i]; }),
@@ -417,13 +397,62 @@
       parts.push(acc ? Math.round(piste / acc * 1000) / 10 : null);
       lignes.push([String(a[i]), piste, acc, acc ? fmt1.format(piste / acc * 100) + " %" : "indisponible"]);
     }
-    graphe("g-piste", { type: "line", plugins: [bandeRupture],
+    graphe("g-piste", { type: "line",
       data: { labels: lab, datasets: [{ label: "Part sur piste cyclable", data: parts, borderColor: C_SERIE1,
               backgroundColor: C_SERIE1, borderWidth: 2, pointRadius: 3, spanGaps: false }] },
-      options: { plugins: { legend: { display: false }, bandeRupture: { depuis: 2018 },
+      options: { plugins: { legend: { display: false },
                             tooltip: { callbacks: { label: function (c) { return fmt1.format(c.parsed.y) + " % des accidents"; } } } },
                  scales: axes({ y: { ticks: { callback: function (v) { return v + " %"; } } } }) } });
     $("d-piste").innerHTML = tableHTML(["Année", "Accidents sur piste cyclable", "Accidents", "Part"], lignes);
+  }
+
+  // ---------------------------------------------------------------- vélo électrique ou classique
+
+  // Cyclistes accidentés selon le type de vélo, depuis que les VAE ont leur catégorie (2018).
+  // On compte des cyclistes (et non des accidents) : un même accident peut impliquer les deux types.
+  function majVae(zone) {
+    var z = zone.z, a = etat.annees, depuis = etat.nat.vae_depuis;
+    var bloc = $("bloc-vae");
+    if (!depuis || !z.vae) { bloc.hidden = true; return; }
+    bloc.hidden = false;
+    var debut = Math.max(etat.debut, depuis), lab = [], vae = [], classique = [], lignes = [];
+    var tot = { vae: 0, cl: 0, tuesVae: 0, tuesCl: 0, gravesVae: 0, gravesCl: 0 };
+    for (var an = debut; an <= etat.fin; an++) {
+      var i = a.indexOf(an);
+      if (i < 0) continue;
+      var cyclistes = z.tues[i] + z.hosp[i] + z.legers[i] + z.indemnes[i] + z.nr[i];
+      var v = z.vae[i], cl = cyclistes - v[0];
+      lab.push(an); vae.push(v[0]); classique.push(cl);
+      tot.vae += v[0]; tot.cl += cl;
+      tot.tuesVae += v[1]; tot.tuesCl += z.tues[i] - v[1];
+      tot.gravesVae += v[1] + v[2]; tot.gravesCl += z.tues[i] + z.hosp[i] - v[1] - v[2];
+      lignes.push([String(an), v[0], cl, cyclistes ? fmt1.format(v[0] / cyclistes * 100) + " %" : "indisponible"]);
+    }
+    if (!lab.length) {
+      $("aide-vae").textContent = "Les vélos à assistance électrique ne sont distingués qu'à partir de " + depuis +
+        " : choisissez une période qui se termine en " + depuis + " ou après.";
+      $("resume-vae").textContent = "";
+      if (etat.graphes["g-vae"]) { etat.graphes["g-vae"].destroy(); delete etat.graphes["g-vae"]; }
+      $("d-vae").innerHTML = "";
+      return;
+    }
+    var periode = lab[0] === lab[lab.length - 1] ? String(lab[0]) : lab[0] + "–" + lab[lab.length - 1];
+    $("aide-vae").textContent = "Cyclistes impliqués dans un accident, selon leur vélo, " + periode +
+      ". Les vélos à assistance électrique n'ont leur propre catégorie dans les fichiers que depuis " + depuis + ".";
+    graphe("g-vae", { type: "bar",
+      data: { labels: lab, datasets: [
+        { label: "Vélo classique", data: classique, backgroundColor: C_SERIE1, borderRadius: 3, barPercentage: 0.8, categoryPercentage: 0.7 },
+        { label: "Vélo à assistance électrique", data: vae, backgroundColor: C_SERIE2, borderRadius: 3, barPercentage: 0.8, categoryPercentage: 0.7 }] },
+      options: { plugins: { tooltip: { mode: "index", intersect: false } }, interaction: { mode: "index", intersect: false },
+                 scales: axes() } });
+    // Résumé : part des VAE, et gravité comparée (tués, tués ou hospitalisés)
+    var total = tot.vae + tot.cl, pc = function (x, n) { return n ? fmt1.format(x / n * 100) + " %" : "indisponible"; };
+    $("resume-vae").textContent = total
+      ? "Sur " + periode + ", " + pc(tot.vae, total) + " des cyclistes accidentés étaient sur un vélo électrique. " +
+        "Part de tués : " + pc(tot.tuesVae, tot.vae) + " sur vélo électrique, " + pc(tot.tuesCl, tot.cl) + " sur vélo classique ; " +
+        "tués ou hospitalisés : " + pc(tot.gravesVae, tot.vae) + " contre " + pc(tot.gravesCl, tot.cl) + "."
+      : "Aucun cycliste accidenté sur la période.";
+    $("d-vae").innerHTML = tableHTML(["Année", "Sur vélo électrique", "Sur vélo classique", "Part des vélos électriques"], lignes);
   }
 
   // ---------------------------------------------------------------- ratios (tableau classable)

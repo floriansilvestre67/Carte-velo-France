@@ -29,9 +29,10 @@ class ClientHTTP:
 
     def _get(self, url: str, **kwargs) -> requests.Response:
         derniere_erreur: Exception | None = None
+        delai = kwargs.pop("timeout", None) or self.delai
         for essai in range(self.relances):
             try:
-                rep = self.session.get(url, timeout=self.delai, **kwargs)
+                rep = self.session.get(url, timeout=delai, **kwargs)
                 # 429 / 5xx : on réessaie après une pause ; 4xx : inutile d'insister
                 if rep.status_code == 429 or rep.status_code >= 500:
                     raise ErreurSource(f"HTTP {rep.status_code} sur {url}")
@@ -44,8 +45,8 @@ class ClientHTTP:
                 time.sleep(2 * (essai + 1))
         raise ErreurSource(f"Échec après {self.relances} essais : {derniere_erreur}")
 
-    def get_json(self, url: str):
-        rep = self._get(url)
+    def get_json(self, url: str, delai: float | None = None):
+        rep = self._get(url, timeout=delai)
         try:
             return rep.json()
         except ValueError as e:
@@ -73,7 +74,7 @@ class ClientFichiers:
             raise ErreurSource(f"URL inconnue (simulée injoignable) : {url}")
         return Path(chemin)
 
-    def get_json(self, url: str):
+    def get_json(self, url: str, delai: float | None = None):
         with open(self._chemin(url), encoding="utf-8") as f:
             return json.load(f)
 

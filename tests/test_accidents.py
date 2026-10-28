@@ -127,7 +127,11 @@ def test_zones_et_regions(resultat):
     assert national["zones_info"]["D63"]["parent"] == "R84"
     assert national["zones_info"]["FR"]["km"] == pytest.approx(sum(p["km_total"] for p in props.values()), abs=0.1)
     assert national["libelles"]["vehicule"][3] == "Bus, car, tram ou train"
-    assert national["ruptures"]
+    # Accident C (2019) : un cycliste sur vélo classique et un sur VAE, tous deux indemnes
+    i2019 = national["annees"].index(2019)
+    assert z["FR"]["vae"][i2019] == [1, 0, 0] and z["D01"]["vae"][i2019] == [1, 0, 0]
+    assert z["FR"]["vae"][i2021] == [0, 0, 0]
+    assert national["vae_depuis"] == 2018 and "ruptures" not in national
 
 
 def test_communes_km_et_grandes_communes(resultat):

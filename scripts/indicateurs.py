@@ -96,3 +96,52 @@ def calculer(departements: list[dict]) -> list[dict]:
         for d in departements:
             d.setdefault("rangs", {})[ind["cle"]] = rangs[d["code"]]
     return departements
+
+
+# --------------------------------------------------------------------------
+# Classement des communes (panneau « Les 10 premières communes » de la carte)
+# --------------------------------------------------------------------------
+
+# Indicateurs calculables à l'échelle d'une commune (les autres n'existent qu'au niveau départemental)
+INDICATEURS_COMMUNES = ["score", "km_total", "km_10k_hab", "km_par_km2", "km_pistes", "km_bandes",
+                        "km_voies_vertes", "km_double_sens", "km_autres", "vls_stations", "vls_velos",
+                        "vls_stations_100k", "stat_places", "stat_places_secu", "stat_secu_1000"]
+
+
+def calculer_communes(fiches: dict[str, dict], seuil_population: int) -> dict:
+    """Indicateurs et score vélo des communes d'au moins `seuil_population` habitants.
+
+    fiches : {code: fiche publiée dans communes/{dep}.json, plus "d" (département)}.
+    Le score suit la même méthode que celui des départements (moyenne des rangs centiles des
+    6 indicateurs de SCORE_INDICATEURS), mais calculée entre ces communes seulement : les très
+    petites communes, où un seul kilomètre change tout, en sont écartées.
+    Les stations VLS sont les vraies stations (les zones virtuelles du free-floating ne comptent pas).
+    """
+    lignes = {}
+    for code, f in fiches.items():
+        pop = f.get("p")
+        if not pop or pop < seuil_population:
+            continue
+        km = f.get("km") or {}
+        vls, stat = f.get("vls"), f.get("stat") or {}
+        d = {"km_total": km.get("t"), "vls_stations": vls.get("st") if vls else None,
+             "vls_velos": vls.get("v") if vls else None,
+             "stat_places": stat.get("p"), "stat_places_secu": stat.get("s"), "stat_secu_1000": stat.get("s1000")}
+        for cat in ("pistes", "bandes", "voies_vertes", "double_sens", "autres"):
+            d["km_" + cat] = km.get(cat, 0) if km else None
+        d["km_10k_hab"] = ratio(d["km_total"], pop, 10_000)
+        d["km_par_km2"] = ratio(d["km_total"], f.get("s"))
+        d["vls_stations_100k"] = ratio(d["vls_stations"], pop, 100_000)
+        lignes[code] = d
+    centiles = {cle: rangs_centiles({c: d.get(cle) for c, d in lignes.items()}) for cle in SCORE_INDICATEURS}
+    for c, d in lignes.items():
+        notes = [centiles[cle][c] for cle in SCORE_INDICATEURS if centiles[cle][c] is not None]
+        # Score seulement si les 6 indicateurs sont connus (sinon la comparaison serait faussée)
+        d["score"] = sum(notes) / len(notes) if len(notes) == len(SCORE_INDICATEURS) else None
+    champs = ["code", "nom", "dep", "pop"] + INDICATEURS_COMMUNES
+    sortie = []
+    for c, d in lignes.items():
+        vals = [None if d.get(k) is None else (float(f"{d[k]:.6g}") if isinstance(d[k], float) else d[k])
+                for k in INDICATEURS_COMMUNES]
+        sortie.append([c, fiches[c].get("n"), fiches[c].get("d"), fiches[c].get("p")] + vals)
+    return {"seuil_population": seuil_population, "champs": champs, "lignes": sortie}

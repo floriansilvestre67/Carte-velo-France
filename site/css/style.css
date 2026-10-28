@@ -188,6 +188,7 @@ input[type="search"] {
 .classement-titre { margin: 0; font-size: 1.05rem; }
 .classement { list-style: none; margin: 0; padding: 0; }
 .classement li + li { margin-top: 2px; }
+.classement-note { font-size: 0.82rem; color: var(--encre-douce); margin: 6px 0 0; }
 .classement button {
   width: 100%; display: grid; grid-template-columns: 2.2em 1fr auto; gap: 8px; align-items: center;
   font: inherit; font-size: 0.92rem; text-align: left; color: var(--encre);

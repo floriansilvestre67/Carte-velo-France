@@ -37,9 +37,11 @@ URL_PAGE = ("https://www.data.gouv.fr/datasets/bases-de-donnees-annuelles-des-ac
             "de-la-circulation-routiere-annees-de-2005-a-2024/")
 URL_DOC = ("https://static.data.gouv.fr/resources/bases-de-donnees-annuelles-des-accidents-corporels-de-la-"
            "circulation-routiere-annees-de-2005-a-2024/20251021-115933/description-des-bases-de-donnees-annuelles.pdf")
-VERSION = 1   # à augmenter si le traitement change : force un nouveau calcul
+VERSION = 2   # à augmenter si le traitement change : force un nouveau calcul
+              # (2 : type de vélo du cycliste, classique ou à assistance électrique)
 
 CATV_VELO = {1, 80}
+CATV_VAE = 80      # vélo à assistance électrique, catégorie distincte depuis 2018
 TABLES = ("caract", "lieux", "vehicules", "usagers")
 
 
@@ -163,7 +165,8 @@ def lire_annee(annee: int, chemins: dict[str, Path]) -> list[dict]:
         if catu == "3" and veh in velos:
             pietons.add(num)
         elif catu in ("1", "2") and veh in velos:
-            cyclistes.setdefault(num, []).append((veh, l.get("grav") or "", l.get("trajet") or ""))
+            catv = next((v[1] for v in avec_velo[num] if v[0] == veh), None)
+            cyclistes.setdefault(num, []).append((veh, l.get("grav") or "", l.get("trajet") or "", catv))
 
     # 3. Lieu (département, commune) et 4. situation
     lieux: dict[str, tuple] = {}
@@ -183,13 +186,14 @@ def lire_annee(annee: int, chemins: dict[str, Path]) -> list[dict]:
     lignes = []
     for num, liste in cyclistes.items():
         dep, com = lieux.get(num, (None, None))
-        for veh, grav, trajet in liste:
+        for veh, grav, trajet, catv in liste:
             autres = [str(v[1]) for v in avec_velo[num] if v[0] != veh and v[1] is not None]
             obsm_pieton = any(v[0] == veh and v[2] == "1" for v in avec_velo[num])
             lignes.append({"Num_Acc": num, "an": annee, "dep": dep, "com": com, "grav": grav,
                            "trajet": trajet, "situ": situations.get(num, ""),
                            "typevehicules": " / ".join(autres),
-                           "obsm": "1" if (num in pietons or obsm_pieton) else ""})
+                           "obsm": "1" if (num in pietons or obsm_pieton) else "",
+                           "vae": "1" if catv == CATV_VAE else ""})
     return lignes
 
 

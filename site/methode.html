@@ -110,6 +110,7 @@
     <p>Pour chaque indicateur, les départements sont classés et reçoivent un rang centile : 100 pour le premier, 0 pour le dernier, les autres régulièrement entre les deux. Les ex æquo reçoivent la moyenne de leurs rangs. Le score est la moyenne de ces six rangs centiles.</p>
     <p>Exemple : un département premier sur trois indicateurs (100), et au milieu du classement sur les trois autres (50), obtient (3 × 100 + 3 × 50) ÷ 6 = 75.</p>
     <p>Le score mesure une position relative entre départements, pas une qualité absolue. Il mélange volontairement des totaux, qui favorisent les grands départements, et des chiffres rapportés à la population ou à la surface, qui favorisent les départements urbains. Si une source est indisponible, le score est calculé sur les indicateurs restants et la fiche du département le signale.</p>
+    <p id="score-communes"><strong>Score des communes.</strong> L'onglet « 10 premières communes » du classement applique la même méthode aux communes de plus de 10 000 habitants : les six indicateurs sont calculés pour chaque commune (les zones virtuelles des vélos en libre-service sans station ne comptent pas comme des stations), puis les rangs centiles sont établis entre ces communes seulement. Une commune n'a de score que si les six indicateurs sont connus. Les autres indicateurs de la carte sont classés de la même façon, quand ils existent à l'échelle communale.</p>
 
     <h2 id="ville">Fiche Ville</h2>
     <p>Une ville est une commune, repérée par son code INSEE. Paris, Lyon et Marseille sont traités comme une seule commune ; leurs arrondissements restent consultables dans la recherche et sur la page Statistiques.</p>
@@ -138,9 +139,20 @@
       <li><a href="https://www.data.gouv.fr/datasets/5b598be088ee387c0c353714">DATAtourisme</a>, base nationale des données touristiques (ADN Tourisme), Licence Ouverte 2.0 : exports quotidiens des lieux, itinéraires et prestations.</li>
       <li><a href="https://www.data.gouv.fr/datasets/immeubles-proteges-au-titre-des-monuments-historiques-2">Immeubles protégés au titre des monuments historiques</a> (Ministère de la Culture, base Mérimée), Licence Ouverte.</li>
       <li><a href="https://www.data.gouv.fr/datasets/musees-de-france-base-museofile">Répertoire des Musées de France, base Muséofile</a> (Ministère de la Culture), Licence Ouverte. Il remplace l'ancienne liste des musées de France, archivée en 2026.</li>
+      <li><a href="https://www.data.gouv.fr/datasets/liste-des-jardins-remarquables/">Liste des jardins remarquables</a> (Ministère de la Culture), Licence Ouverte 2.0.</li>
+      <li><a href="https://www.wikidata.org/">Wikidata</a> (domaine public, CC0) : sert uniquement à mesurer la notoriété des monuments historiques.</li>
     </ul>
-    <h3>Sélection</h3>
-    <p>Sont retenus les lieux qui valent une visite à vélo : musées, monuments et sites patrimoniaux, parcs et jardins, sites naturels et points de vue, itinéraires vélo, et loueurs ou réparateurs de vélos. Les hébergements, restaurants, événements, commerces, fermes, bibliothèques et salles de spectacle sont écartés. <span id="comptes-poi"></span></p>
+    <h3>Sélection : les lieux les plus remarquables</h3>
+    <p>Pour que la carte reste lisible, seuls les lieux les plus dignes d'intérêt sont affichés, selon des règles identiques partout en France :</p>
+    <ul>
+      <li><strong>Musées</strong> : les musées de France (label officiel du Ministère de la Culture).</li>
+      <li><strong>Monuments historiques</strong> : ceux qui ont une notoriété au-delà du local, c'est-à-dire dont la fiche <a href="https://www.wikidata.org/">Wikidata</a> (reliée par la référence Mérimée) compte au moins <span id="seuil-notoriete">5</span> pages sur les projets Wikimedia (des articles Wikipédia en plusieurs langues, par exemple). Si Wikidata est injoignable lors d'un calcul, ce sont les monuments classés que décrit un office de tourisme.</li>
+      <li><strong>Autre patrimoine non protégé</strong> (lavoirs, croix, petites chapelles…) : non affiché.</li>
+      <li><strong>Parcs et jardins</strong> : les jardins labellisés « Jardin remarquable ».</li>
+      <li><strong>Sites naturels, points de vue et itinéraires vélo</strong> : ceux qu'un office de tourisme décrit vraiment (au moins 80 caractères de description).</li>
+      <li><strong>Loueurs et réparateurs de vélos</strong> : tous, car ils sont utiles aux cyclistes.</li>
+    </ul>
+    <p>Les hébergements, restaurants, événements, commerces, fermes, bibliothèques et salles de spectacle ne sont jamais retenus. <span id="comptes-poi"></span></p>
     <h3>Rattachement et doublons</h3>
     <p>DATAtourisme et Muséofile ne donnent pas de code commune : chaque lieu est rattaché à la commune qui contient sa position. Un monument ou un musée officiel qui correspond à un lieu DATAtourisme de même nature (à moins de 30 m, ou à moins de 150 m avec un nom proche) n'apparaît qu'une fois, avec son statut officiel. Dans la fiche d'une ville, les lieux mis en avant sont d'abord les musées de France et les monuments classés. Les lieux sont recalculés une fois par semaine.</p>
 
@@ -155,9 +167,10 @@
       <li>Quand plusieurs véhicules sont en cause, le plus lourd est retenu (poids lourd, puis transport en commun, utilitaire, voiture, deux-roues motorisé, vélo, trottinette). Un accident sans autre véhicule mais avec un piéton heurté est classé « Piéton ».</li>
       <li>Les codes sont harmonisés entre les deux générations de fichiers (2005–2018 et depuis 2019) : département sur trois caractères avant 2019 (« 590 » pour le Nord, « 201 » et « 202 » pour la Corse), anciens codes de Paris (« 750NN »), communes fusionnées depuis 2005 rattachées à leur commune actuelle. Paris, Lyon et Marseille sont regroupés, avec un détail par arrondissement.</li>
     </ul>
-    <h3>Ruptures de série</h3>
+    <h3>Points de vigilance</h3>
     <ul>
-      <li><strong>Depuis 2018</strong>, les vélos à assistance électrique ont leur propre catégorie dans les fichiers ; ils sont comptés ici avec les vélos classiques. La façon dont ils étaient enregistrés avant 2018 n'est pas documentée : la comparaison avant et après 2018 demande un peu de prudence.</li>
+      <li><strong>Vélos à assistance électrique</strong> : ils ont leur propre catégorie dans les fichiers depuis 2018. Dans les totaux, ils sont comptés avec les vélos classiques ; le graphique « Vélo électrique ou vélo classique » les distingue à partir de 2018, en comptant des cyclistes accidentés (un même accident peut impliquer les deux types). Faute de connaître le nombre de vélos électriques en circulation et les distances parcourues, il ne mesure pas un risque.</li>
+      <li><strong>Valeurs non renseignées</strong> : les graphiques du motif de déplacement et de la situation de l'accident n'affichent que les accidents où l'information est renseignée.</li>
       <li><strong>Depuis 2019</strong>, l'indicateur « blessé hospitalisé » n'est plus labellisé comme statistique publique par l'ONISR.</li>
       <li><strong>Depuis 2019</strong>, les situations « autre voie spéciale » et « autre » existent ; avant, le code 0 servait aussi pour « non renseigné », et le motif de déplacement manque pour une part importante des cyclistes.</li>
     </ul>

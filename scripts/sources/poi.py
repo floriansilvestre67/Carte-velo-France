@@ -6,6 +6,18 @@ Sources (toutes en Licence Ouverte) :
     CSV quotidiens contiennent les mêmes lieux en trois fichiers.
   - Monuments historiques (Ministère de la Culture, base Mérimée) : CSV complet, coordonnées WGS84.
   - Musées de France (Ministère de la Culture, base Muséofile), qui remplace l'ancienne liste archivée.
+  - Jardins remarquables (Ministère de la Culture), label officiel.
+  - Wikidata (CC0) : sert seulement à mesurer la notoriété des monuments historiques.
+
+Sélection des « lieux les plus remarquables » (pour ne pas couvrir les villes de milliers de points) :
+  - musées : seulement les musées de France (label officiel) ;
+  - monuments historiques : ceux dont la fiche Wikidata (reliée par la référence Mérimée) a au moins
+    SEUIL_NOTORIETE pages sur les projets Wikimedia (articles Wikipédia en plusieurs langues, etc.) ;
+    si Wikidata est injoignable : les monuments classés que décrit un office de tourisme ;
+  - autre patrimoine non protégé : écarté ;
+  - parcs et jardins : seulement les jardins remarquables ;
+  - nature, points de vue et itinéraires vélo : seulement ceux qui ont une vraie description ;
+  - location et réparation de vélos : tous (utiles aux cyclistes).
 
 Sélection DATAtourisme (classes de l'ontologie, dernier segment de l'URI) :
   gardés  : sites culturels et patrimoine, musées, parcs et jardins, patrimoine naturel,
@@ -30,7 +42,15 @@ from pathlib import Path
 
 from sources.communes import departement_du_code
 
-VERSION = 3  # à augmenter quand la sélection change : force le recalcul sans attendre la semaine
+VERSION = 4  # à augmenter quand la sélection change : force le recalcul sans attendre la semaine
+ID_JARDINS = "liste-des-jardins-remarquables"     # identifiant lisible du jeu sur data.gouv.fr
+
+# Notoriété des monuments : nombre de pages Wikimedia de l'élément Wikidata qui porte la référence Mérimée
+URL_WIKIDATA = ("https://query.wikidata.org/sparql?format=json&query="
+                "SELECT%20%3Fref%20(MAX(%3Fn)%20AS%20%3Fs)%20WHERE%20%7B%20%3Fi%20wdt%3AP380%20%3Fref%20%3B%20"
+                "wikibase%3Asitelinks%20%3Fn%20.%20%7D%20GROUP%20BY%20%3Fref")
+SEUIL_NOTORIETE = 5
+LONGUEUR_DESCRIPTION = 80       # une « vraie » description : au moins 80 caractères
 ID_DATATOURISME = "5b598be088ee387c0c353714"
 ID_MERIMEE = "5af120e5b595087cfabcde81"
 ID_MUSEOFILE = "5d12ee8206e3e762c0c89a4c"
@@ -42,7 +62,7 @@ csv.field_size_limit(min(sys.maxsize, 2 ** 31 - 1))
 CATEGORIES = ["Musée", "Monument historique", "Patrimoine", "Parc ou jardin", "Nature et point de vue",
               "Itinéraire vélo", "Location ou réparation de vélos"]
 C_MUSEE, C_MH, C_PATRIMOINE, C_PARC, C_NATURE, C_ITINERAIRE, C_SERVICE = range(7)
-FAMILLE = {C_MUSEE: "musee", C_MH: "patrimoine", C_PATRIMOINE: "patrimoine"}
+FAMILLE = {C_MUSEE: "musee", C_MH: "patrimoine", C_PATRIMOINE: "patrimoine", C_PARC: "parc"}
 
 CLASSES_MUSEE = {"museum"}
 CLASSES_PATRIMOINE = {"culturalsite", "cityheritage", "religioussite", "church", "cathedral", "chapel", "abbey",
@@ -288,7 +308,93 @@ def dedoublonner(datatourisme: list[dict], officiels: list[dict], stats: dict) -
 
 
 CHAMPS = ["lat", "lon", "nom", "categorie", "commune", "source", "lien", "description", "statut"]
-SOURCES = ["DATAtourisme", "Mérimée", "Muséofile"]
+SOURCES = ["DATAtourisme", "Mérimée", "Muséofile", "Jardins remarquables"]
+STATUT_JARDIN = "jardin remarquable"
+
+
+def lire_jardins(chemin: Path, placeur: Placeur, stats: dict) -> list[dict]:
+    """Liste officielle des jardins remarquables. Les noms de colonnes sont retrouvés par mots-clés."""
+    lieux = []
+    for l in lignes_csv(chemin):
+        stats["jardins_lignes"] += 1
+        cle = lambda *mots: next((k for k in l if all(m in k for m in mots)), None)  # noqa: E731
+        pos = None
+        c = cle("coordonn") or cle("geo")
+        if c:
+            pos = coordonnees(l.get(c))
+        if not pos and cle("latitude") and cle("longitude"):
+            lat, lon = _nombre(l.get(cle("latitude"))), _nombre(l.get(cle("longitude")))
+            pos = (lat, lon) if lat is not None and lon is not None else None
+        nom = (l.get(cle("nom", "jardin") or cle("nom") or "") or "").strip()
+        if not pos or not nom:
+            continue
+        dep, com = placeur.placer(*pos)
+        if not dep:
+            continue
+        lien = (l.get(cle("site") or cle("url") or "") or "").strip()
+        if lien and not lien.startswith("http"):
+            lien = "https://" + lien
+        desc = l.get(cle("descri") or cle("resume") or cle("presentation") or "")
+        lieux.append({"lat": pos[0], "lon": pos[1], "nom": nom, "cat": C_PARC, "dep": dep, "com": com,
+                      "src": "Jardins remarquables", "lien": lien, "desc": _court(desc), "statut": STATUT_JARDIN})
+    return lieux
+
+
+def notoriete_wikidata(client) -> dict[str, int]:
+    """{référence Mérimée: nombre de pages Wikimedia de l'élément Wikidata correspondant}."""
+    rep = client.get_json(URL_WIKIDATA, delai=180)
+    res = {}
+    for b in (rep.get("results") or {}).get("bindings") or []:
+        ref = ((b.get("ref") or {}).get("value") or "").strip().upper()
+        try:
+            res[ref] = int((b.get("s") or {}).get("value"))
+        except (TypeError, ValueError):
+            continue
+    if not res:
+        raise ValueError("réponse Wikidata vide")
+    return res
+
+
+def reference_merimee(p: dict) -> str | None:
+    """Référence Mérimée (ex. PA00088801) d'un lieu, à partir de son lien officiel."""
+    for lien in (p.get("lien"), p.get("autre_lien")):
+        m = re.search(r"/merimee/([A-Z]{2}\d+)", str(lien or ""), re.I)
+        if m:
+            return m.group(1).upper()
+    return None
+
+
+def selectionner(lieux: list[dict], notoriete: dict[str, int] | None, stats: dict) -> list[dict]:
+    """Ne garde que les lieux les plus remarquables (règles en tête de fichier)."""
+    gardes = []
+    pages = Counter()
+    for p in lieux:
+        cat, desc_ok = p["cat"], len(p.get("desc") or "") >= LONGUEUR_DESCRIPTION
+        if cat == C_MUSEE:
+            ok = p.get("statut") == "musée de France"
+        elif cat == C_MH:
+            ref = reference_merimee(p)
+            if notoriete is not None:
+                n = notoriete.get(ref, 0) if ref else 0
+                pages[min(n, 30)] += 1
+                ok = n >= SEUIL_NOTORIETE
+            else:                                  # repli sans Wikidata
+                ok = "class" in (p.get("statut") or "") and p["src"] == "DATAtourisme" and desc_ok
+        elif cat == C_PATRIMOINE:
+            ok = False
+        elif cat == C_PARC:
+            ok = p.get("statut") == STATUT_JARDIN
+        elif cat in (C_NATURE, C_ITINERAIRE):
+            ok = desc_ok
+        else:
+            ok = True
+        stats["selection_" + ("gardes" if ok else "ecartes")] += 1
+        if ok:
+            gardes.append(p)
+    # Combien de monuments resteraient pour chaque seuil (aide au réglage, publiée dans meta.json)
+    if notoriete is not None:
+        stats["monuments_par_seuil"] = {str(k): sum(v for n, v in pages.items() if n >= k) for k in range(1, 21)}
+    return gardes
 
 
 def calculer(client, travail: Path, codes_valides: set[str], localisateur_dep, localisateur_communes=None) -> dict:
@@ -299,7 +405,8 @@ def calculer(client, travail: Path, codes_valides: set[str], localisateur_dep, l
         chemins.append(client.telecharger(r["url"], travail / r["title"]))
     dt = lire_datatourisme(chemins, placeur, stats)
     officiels, erreurs = [], []
-    for id_jeu, lire, nom in ((ID_MUSEOFILE, lire_museofile, "museofile"), (ID_MERIMEE, lire_merimee, "merimee")):
+    for id_jeu, lire, nom in ((ID_MUSEOFILE, lire_museofile, "museofile"), (ID_MERIMEE, lire_merimee, "merimee"),
+                              (ID_JARDINS, lire_jardins, "jardins")):
         try:
             r = ressource_csv(client, id_jeu)
             officiels += lire(client.telecharger(r["url"], travail / f"{nom}.csv"), placeur, stats)
@@ -309,6 +416,14 @@ def calculer(client, travail: Path, codes_valides: set[str], localisateur_dep, l
     if not officiels and not erreurs:
         erreurs.append("aucun monument ni musée lu (format des fichiers à vérifier)")
     tous = dedoublonner(dt, officiels, stats)
+    stats["avant_selection"] = dict(Counter(CATEGORIES[p["cat"]] for p in tous))
+    try:
+        notoriete = notoriete_wikidata(client)
+        stats["wikidata_references"] = len(notoriete)
+    except Exception as e:                         # repli : règle sans Wikidata, signalée
+        notoriete = None
+        erreurs.append(f"wikidata : {e} (repli : monuments classés décrits par un office de tourisme)")
+    tous = selectionner(tous, notoriete, stats)
     par_dep: dict[str, list] = {}
     for p in tous:
         par_dep.setdefault(p["dep"], []).append([
