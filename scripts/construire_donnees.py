@@ -333,6 +333,7 @@ def construire(client, sortie: Path, travail: Path, url_precedent: str | None = 
     # 5. Accidents de vélo (fichiers BAAC de l'ONISR)
     journal("5/6 Accidents de vélo (fichiers BAAC de l'ONISR)…")
     accs = None
+    erreur_accidents = None
     ancien_acc = ((precedent or {}).get("meta", {}).get("sources") or {}).get("accidents") or {}
     try:
         inv = baac.inventaire(client)
@@ -359,6 +360,7 @@ def construire(client, sortie: Path, travail: Path, url_precedent: str | None = 
         journal(f"  ✗ {e}")
         traceback.print_exc()
         accs = None
+        erreur_accidents = f"{type(e).__name__} : {e}"[:300]
 
     # 5 bis. Cyclistes : actifs allant travailler à vélo (Insee, recensement 2017 et 2023)
     journal("   Actifs allant travailler à vélo (Insee)…")
@@ -385,7 +387,7 @@ def construire(client, sortie: Path, travail: Path, url_precedent: str | None = 
 
     ecrire_accidents_et_communes(client, sortie, url_precedent, sources_meta, deps, par_code, region_de,
                                  liste_communes, correspondance, km_communes, accs, vls_communes, stat_communes,
-                                 cyc)
+                                 cyc, erreur_accidents)
     ecrire_stationnement(client, sortie, url_precedent, codes, emplacements_osm, sources_meta)
     if poi_par_dep is not None:
         total = 0
@@ -466,7 +468,7 @@ def ecrire_communes_carte(client, sortie, url_precedent, codes, liste_communes, 
 
 def ecrire_accidents_et_communes(client, sortie, url_precedent, sources_meta, deps, par_code, region_de,
                                  liste_communes, correspondance, km_communes, accs, vls_communes=None,
-                                 stat_communes=None, cyc=None) -> None:
+                                 stat_communes=None, cyc=None, erreur_accidents=None) -> None:
     """Écrit accidents/national.json et communes/{dep}.json.
 
     Chaque composante manquante aujourd'hui (liste des communes, km par commune,
@@ -516,7 +518,8 @@ def ecrire_accidents_et_communes(client, sortie, url_precedent, sources_meta, de
             ancienne = sources_meta.get("accidents") or {}
             sources_meta["accidents"] = {**ancienne, "statut": "reprise",
                                          "detail": "Source injoignable aujourd'hui : chiffres repris de la "
-                                                   "mise à jour précédente."}
+                                                   "mise à jour précédente.",
+                                         "erreur": erreur_accidents}
         else:
             sources_meta["accidents"] = {"statut": "indisponible", "detail": "Source injoignable."}
 
