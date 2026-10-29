@@ -1,4 +1,4 @@
-/* Carte Vélo France — carte d'accueil, simplifiée (index.html).
+/* Carte Vélo France — carte simplifiée (carte.html).
    Départements colorés selon le score vélo (le même que sur la carte détaillée, six indicateurs ;
    pour les communes, calculé par le pipeline entre toutes les communes de métropole), recherche
    de ville, fiche courte au clic, et les quatre calques. Le code commun avec la carte détaillée est dans js/commun.js. */

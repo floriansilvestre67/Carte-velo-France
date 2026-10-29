@@ -1,0 +1,50 @@
+/* Page d'accueil (index.html) : slogan, descriptif et accès à la carte. */
+
+.page-intro { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; background: var(--fond); }
+
+.intro {
+  flex: 1; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr); align-items: center;
+  gap: 32px; max-width: 1120px; width: 100%; margin: 0 auto; padding: 48px 32px 64px;
+}
+.intro:focus { outline: none; }
+
+.intro h1 {
+  margin: 0; font-size: clamp(2.3rem, 5.2vw, 4rem); line-height: 1.05; letter-spacing: -0.01em; color: var(--encre);
+}
+.accroche {
+  margin: 14px 0 0; font-size: clamp(1.25rem, 2.4vw, 1.7rem); font-weight: 700; color: var(--vert-fonce); line-height: 1.25;
+}
+.descriptif { margin: 22px 0 0; font-size: 1.12rem; line-height: 1.5; color: var(--encre-douce); max-width: 34ch; }
+
+.bouton-principal {
+  display: inline-flex; align-items: center; gap: 10px; margin-top: 32px; min-height: 52px; padding: 12px 26px;
+  border-radius: 999px; background: var(--vert-fonce); color: #ffffff; font-size: 1.1rem; font-weight: 700;
+  text-decoration: none; box-shadow: 0 4px 14px rgba(10, 90, 66, 0.28); transition: transform 0.15s, box-shadow 0.15s;
+}
+.bouton-principal:hover { color: #ffffff; background: var(--vert); transform: translateY(-1px); box-shadow: 0 6px 18px rgba(10, 90, 66, 0.32); }
+.bouton-principal:focus-visible { outline: 3px solid #f2a900; outline-offset: 3px; }
+.bouton-principal svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Illustration : itinéraire et étapes, dans la palette verte de la carte */
+.intro-illustration { width: 100%; max-width: 440px; justify-self: center; overflow: visible; }
+.intro-illustration .trace-fond { fill: none; stroke: #e3f2ea; stroke-width: 26; stroke-linecap: round; }
+.intro-illustration .trace { fill: none; stroke: var(--vert); stroke-width: 5; stroke-linecap: round; stroke-dasharray: 2 14; }
+.intro-illustration .etape { stroke: #ffffff; stroke-width: 4; }
+.intro-illustration .e1 { fill: #a8d8bf; }
+.intro-illustration .e2 { fill: #5fb592; }
+.intro-illustration .e3 { fill: #21885f; }
+.intro-illustration .e4 { fill: #0b5a40; }
+.intro-illustration .velo circle, .intro-illustration .velo path {
+  fill: none; stroke: var(--encre); stroke-width: 4.5; stroke-linecap: round; stroke-linejoin: round;
+}
+
+@media (max-width: 760px) {
+  .intro { grid-template-columns: 1fr; gap: 12px; padding: 32px 20px 40px; text-align: left; }
+  .intro-illustration { max-width: 240px; justify-self: center; margin-top: 16px; }
+  .bouton-principal { width: 100%; justify-content: center; }
+}
+@media (max-width: 640px) {
+  .page-intro .bandeau { padding-left: 16px; padding-right: 16px; }
+  .page-intro .bandeau nav { overflow-x: auto; flex-wrap: nowrap; max-width: 100%; }
+  .page-intro .bandeau nav a { white-space: nowrap; }
+}

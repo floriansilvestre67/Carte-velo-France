@@ -2,12 +2,13 @@
 
 Carte interactive de la France métropolitaine montrant où le vélo est le mieux servi : aménagements cyclables, vélos en libre-service (VLS), stationnement vélo, lieux à visiter, accidents de vélo et un « score vélo » sur 100. On peut descendre au niveau de chaque ville. Toutes les données sont ouvertes et recalculées chaque jour.
 
-- **Carte** (page d'accueil, grand public) : départements colorés selon le score vélo (le même que sur la carte détaillée), recherche de ville, fiche courte avec le classement, et quatre calques à activer.
+- **Accueil** : le slogan « Où fait-il bon pédaler ? Le baromètre des territoires cyclables. » et l'accès à la carte.
+- **Carte** (grand public) : départements colorés selon le score vélo (le même que sur la carte détaillée), recherche de ville, fiche courte avec le classement, et quatre calques à activer.
 - **Carte détaillée** : tous les indicateurs, filtres par région et département, classements, fiche Ville complète et les mêmes calques.
 - **Statistiques** : accidents de vélo par zone (France, région, département, ville) et par période, avec graphiques, ratios et corrélations.
 - **Sources et méthode** : origine de chaque donnée, définitions, limites et état du dernier calcul.
 
-Une ville se partage par son code INSEE dans l'adresse, sur toutes les pages : `?ville=63113`. Les anciens liens de la carte (avec `#ind=`, `#reg=`, `#dep=` ou `?arr=`) ouvrent automatiquement la carte détaillée.
+Une ville se partage par son code INSEE dans l'adresse, sur toutes les pages : `?ville=63113`. Les anciens liens de la carte restent valables : une adresse avec `?ville=` ouvre la carte, et une adresse avec `#ind=`, `#reg=`, `#dep=` ou `?arr=` ouvre la carte détaillée.
 
 Site : https://floriansilvestre67.github.io/Carte-velo-France/
 
@@ -62,13 +63,14 @@ scripts/
     poi.py                lieux à visiter (DATAtourisme, Mérimée, Muséofile, jardins remarquables, Wikidata)
 tests/                    tests sur données fictives au format réel
 site/
-  index.html              la carte d'accueil, simplifiée
+  index.html              page d'accueil (slogan, accès à la carte)
+  carte.html              la carte simplifiée
   carte-detaillee.html    la carte détaillée
   statistiques.html       la page Statistiques (accidents)
   methode.html            page « Sources et méthode »
-  css/style.css, css/accueil.css, css/statistiques.css
+  css/style.css, css/intro.css, css/accueil.css, css/statistiques.css
   js/commun.js            code commun aux deux cartes : formats, fond de carte, calques et leurs bascules
-  js/accueil.js           carte d'accueil (fiche courte, communes cliquables)
+  js/accueil.js           carte simplifiée (fiche courte, communes cliquables)
   js/app.js               carte détaillée, fiche Ville
   js/ville.js             recherche de ville (commune aux deux pages)
   js/statistiques.js      graphiques (Chart.js) et filtres

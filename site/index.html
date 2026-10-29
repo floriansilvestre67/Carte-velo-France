@@ -3,15 +3,17 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Carte Vélo France</title>
-  <meta name="description" content="Où fait-il bon pédaler en France ? Score vélo des départements et des villes, aménagements cyclables et vélos en libre-service.">
+  <title>Carte Vélo France – Le baromètre des territoires cyclables</title>
+  <meta name="description" content="Où fait-il bon pédaler ? Le baromètre des territoires cyclables : trouvez les meilleurs itinéraires et les services vélos près de chez vous et partout en France.">
   <script>
-    /* Anciens liens partagés : une adresse avec des réglages de la carte détaillée (indicateur, région,
-       département, arrondissement) ouvre la carte détaillée, comme avant. */
+    /* Anciens liens partagés (quand la carte était la page d'accueil) :
+       réglages de la carte détaillée -> carte détaillée ; ville seule -> carte. */
     (function () {
       var h = new URLSearchParams(location.hash.slice(1)), q = new URLSearchParams(location.search);
       if (h.has("ind") || h.has("reg") || h.has("dep") || q.has("arr")) {
         location.replace("carte-detaillee.html" + location.search + location.hash);
+      } else if (q.has("ville")) {
+        location.replace("carte.html" + location.search);
       }
     })();
   </script>
@@ -19,48 +21,44 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
   <link rel="stylesheet" href="css/style.css">
-  <link rel="stylesheet" href="css/accueil.css">
+  <link rel="stylesheet" href="css/intro.css">
 </head>
-<body class="page-accueil">
-  <a class="lien-evitement" href="#recherche-ville">Aller à la recherche</a>
+<body class="page-intro">
+  <a class="lien-evitement" href="#contenu">Aller au contenu</a>
 
-  <header class="bandeau bandeau-accueil">
-    <a class="marque" href="./"><span class="pastille" aria-hidden="true"></span>Carte Vélo France</a>
+  <header class="bandeau">
+    <a class="marque" href="./" aria-current="page"><span class="pastille" aria-hidden="true"></span>Carte Vélo France</a>
     <nav aria-label="Navigation principale">
-      <a href="./" aria-current="page">Carte</a>
-      <a href="carte-detaillee.html" id="lien-detail-nav">Carte détaillée</a>
+      <a href="carte.html">Carte</a>
+      <a href="carte-detaillee.html">Carte détaillée</a>
       <a href="statistiques.html">Statistiques</a>
       <a href="methode.html">Sources et méthode</a>
     </nav>
   </header>
 
-  <main class="accueil">
-    <h1 class="visuellement-cache">Score vélo des départements et des villes</h1>
-    <div id="carte" role="region" aria-label="Carte des départements, colorés selon le score vélo"></div>
-
-    <div class="recherche-flottante champ-ville">
-      <label class="visuellement-cache" for="recherche-ville">Rechercher une ville</label>
-      <svg class="loupe" viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M13 13l4.5 4.5"/></svg>
-      <input type="search" id="recherche-ville" placeholder="Rechercher une ville" spellcheck="false" autocomplete="off">
-      <ul id="suggestions-ville" class="suggestions" hidden></ul>
+  <main id="contenu" class="intro" tabindex="-1">
+    <div class="intro-texte">
+      <h1>Où fait-il bon pédaler&nbsp;?</h1>
+      <p class="accroche">Le baromètre des territoires cyclables.</p>
+      <p class="descriptif">Trouvez les meilleurs itinéraires et les services vélos près de chez vous et partout en France.</p>
+      <a class="bouton-principal" href="carte.html">Voir la carte
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h11M11 5l5 5-5 5"/></svg></a>
     </div>
 
-    <section class="fiche-courte" id="fiche-courte" hidden aria-live="polite" tabindex="-1"></section>
-
-    <div class="legende-simple" id="legende-simple" aria-live="polite">
-      <p class="legende-titre">Score vélo</p>
-      <div class="legende-bande" id="legende-bande" aria-hidden="true"></div>
-      <div class="legende-valeurs"><span>moins</span><span>plus</span></div>
-    </div>
+    <!-- Illustration décorative : un itinéraire qui relie des étapes, aux couleurs de la carte -->
+    <svg class="intro-illustration" viewBox="0 0 400 360" aria-hidden="true" focusable="false">
+      <path class="trace-fond" d="M40 300 C 110 300, 90 210, 160 200 S 250 250, 280 170 S 330 70, 370 60"/>
+      <path class="trace" d="M40 300 C 110 300, 90 210, 160 200 S 250 250, 280 170 S 330 70, 370 60"/>
+      <circle class="etape e1" cx="40" cy="300" r="13"/>
+      <circle class="etape e2" cx="160" cy="200" r="11"/>
+      <circle class="etape e3" cx="280" cy="170" r="11"/>
+      <circle class="etape e4" cx="370" cy="60" r="15"/>
+      <g class="velo" transform="translate(198 236) rotate(-12)">
+        <circle cx="0" cy="0" r="17"/><circle cx="52" cy="0" r="17"/>
+        <path d="M0 0l16-30h26l10 30M16-30l12 30M38-40h10M14-38h-8"/>
+      </g>
+    </svg>
   </main>
-
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
-  <script src="js/ville.js"></script>
-  <script src="js/commun.js"></script>
-  <script src="js/accueil.js"></script>
 </body>
 </html>
