@@ -1,0 +1,64 @@
+/* Carte d'accueil, simplifiée : la carte occupe tout l'écran sous un bandeau compact ;
+   autour d'elle seulement la recherche, la légende, les bascules des calques et la fiche courte. */
+
+.page-accueil { height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+.bandeau-accueil { padding: 8px 18px; gap: 8px 16px; flex: none; }
+.bandeau-accueil .marque { font-size: 1.05rem; }
+.bandeau-accueil nav a { font-size: 0.92rem; padding: 6px 8px; }
+
+.accueil { position: relative; flex: 1; min-height: 0; }
+.accueil #carte { position: absolute; inset: 0; height: auto; }
+
+/* Recherche : flottante en haut à gauche */
+.recherche-flottante {
+  position: absolute; z-index: 1000; top: 12px; left: 12px; width: min(340px, calc(100% - 190px));
+}
+.recherche-flottante input {
+  width: 100%; font: inherit; color: var(--encre); padding: 11px 14px 11px 40px; min-height: 46px;
+  border: 1px solid #b9c6c2; border-radius: 999px; background: #ffffff;
+  box-shadow: 0 2px 8px rgba(31, 42, 46, 0.18);
+}
+.recherche-flottante input:focus-visible { outline: 3px solid #f2a900; outline-offset: 2px; }
+.recherche-flottante .loupe {
+  position: absolute; left: 14px; top: 13px; width: 20px; height: 20px; fill: none; stroke: var(--encre-douce);
+  stroke-width: 1.8; stroke-linecap: round; pointer-events: none;
+}
+.recherche-flottante .suggestions { border-radius: 12px; }
+
+/* Légende minimale : en bas à gauche */
+.legende-simple {
+  position: absolute; z-index: 900; left: 12px; bottom: 22px; padding: 8px 12px 9px; width: 190px;
+  background: rgba(255, 255, 255, 0.94); border-radius: 10px; box-shadow: 0 1px 6px rgba(31, 42, 46, 0.16);
+}
+.legende-simple .legende-titre { font-size: 0.85rem; font-weight: 700; margin: 0 0 5px; }
+.legende-simple .legende-bande { display: flex; height: 10px; border-radius: 3px; overflow: hidden; }
+.legende-simple .legende-bande span { flex: 1; }
+.legende-simple .legende-valeurs { display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--encre-douce); margin-top: 3px; }
+
+/* Fiche courte : carte flottante sous la recherche (ordinateur), panneau en bas (mobile) */
+.fiche-courte {
+  position: absolute; z-index: 950; top: 70px; left: 12px; width: 300px; padding: 14px 16px 16px;
+  background: #ffffff; border-radius: 12px; box-shadow: 0 4px 16px rgba(31, 42, 46, 0.2);
+}
+.fiche-courte .fiche-tete { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.fiche-courte h2 { margin: 0; font-size: 1.15rem; line-height: 1.25; }
+.fiche-courte h2 .code { display: block; font-weight: 400; font-size: 0.85rem; color: var(--encre-douce); }
+.score-court { margin: 10px 0 0; display: flex; align-items: baseline; gap: 6px; }
+.score-court .valeur { font-size: 2.4rem; font-weight: 700; line-height: 1; color: var(--vert-fonce); }
+.score-court .unite { color: var(--encre-douce); }
+.rang-court { margin: 2px 0 0; font-size: 0.9rem; color: var(--encre-douce); }
+.fiche-courte dl { margin: 12px 0 10px; }
+.fiche-courte dl div { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-top: 1px solid var(--trait); }
+.fiche-courte dt { color: var(--encre-douce); font-size: 0.9rem; }
+.fiche-courte dd { margin: 0; font-weight: 700; white-space: nowrap; }
+.lien-detail { font-size: 0.88rem; }
+
+@media (max-width: 700px) {
+  .bandeau-accueil { padding: 6px 12px; }
+  .bandeau-accueil nav { overflow-x: auto; flex-wrap: nowrap; max-width: 100%; }
+  .bandeau-accueil nav a { white-space: nowrap; font-size: 0.85rem; padding: 6px 6px; }
+  .recherche-flottante { top: 8px; left: 8px; width: calc(100% - 160px); }
+  .legende-simple { left: 8px; bottom: 16px; width: 150px; }
+  .fiche-courte { top: auto; bottom: 0; left: 0; right: 0; width: auto; border-radius: 14px 14px 0 0;
+    max-height: 48%; overflow-y: auto; padding: 12px 16px 16px; }
+}

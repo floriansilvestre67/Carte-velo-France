@@ -1,4 +1,6 @@
-/* Carte Vélo France — logique de la carte.
+/* Carte Vélo France — logique de la carte détaillée (carte-detaillee.html).
+   Le code partagé avec la carte d'accueil (formats, fond de carte, calques et leurs bascules)
+   est dans js/commun.js.
    Les données sont produites chaque jour par scripts/construire_donnees.py :
      data/meta.json             description des indicateurs, statut des sources, date
      data/departements.geojson  contours + chiffres de chaque département
@@ -7,10 +9,7 @@
 (function () {
   "use strict";
 
-  // Palette séquentielle (5 classes) : du vert très clair au vert foncé.
-  var COULEURS = ["#e3f2ea", "#a8d8bf", "#5fb592", "#21885f", "#0b5a40"];
-  var COULEUR_INDISPO = "#c9cfcc";
-  var NB_CLASSES = COULEURS.length;
+  var COULEURS = CVF.COULEURS;
 
   var etat = {
     meta: null,
@@ -25,9 +24,7 @@
     partie: "haut",      // onglet du classement
     seuils: [],
     couches: {},         // code -> couche Leaflet
-    calqueDeps: null,
-    calqueVLS: null,
-    calqueCyclOSM: null
+    calqueDeps: null
   };
 
   var $ = function (id) { return document.getElementById(id); };
@@ -52,22 +49,7 @@
     return u === "/ 100" ? texte + " / 100" : texte + " " + u;
   }
 
-  function ordinal(n) { return n === 1 ? "1er" : n + "e"; }
-
-  function echapper(texte) {
-    var div = document.createElement("div");
-    div.textContent = texte == null ? "" : String(texte);
-    return div.innerHTML;
-  }
-
-  function dateFr(iso, avecHeure) {
-    if (!iso) return null;
-    var d = new Date(iso.length === 10 ? iso + "T12:00:00" : iso);
-    if (isNaN(d)) return iso;
-    var opts = { day: "numeric", month: "long", year: "numeric" };
-    if (avecHeure) { opts.hour = "2-digit"; opts.minute = "2-digit"; }
-    return d.toLocaleString("fr-FR", opts).replace(/^1 /, "1er ");
-  }
+  var ordinal = CVF.ordinal, echapper = CVF.echapper, dateFr = CVF.dateFr;
 
   function proprietes() { return etat.geo.features.map(function (f) { return f.properties; }); }
 
@@ -100,49 +82,14 @@
 
   /* Seuils par quantiles : chaque couleur regroupe à peu près le même nombre de départements. */
   function calculerSeuils(cle) {
-    var valeurs = proprietes().map(function (p) { return p[cle]; })
-      .filter(function (v) { return v !== null && v !== undefined; })
-      .sort(function (a, b) { return a - b; });
-    if (!valeurs.length) return [];
-    var seuils = [valeurs[0]];
-    for (var i = 1; i < NB_CLASSES; i++) {
-      seuils.push(valeurs[Math.floor(i * valeurs.length / NB_CLASSES)]);
-    }
-    seuils.push(valeurs[valeurs.length - 1]);
-    return seuils;
+    return CVF.seuilsQuantiles(proprietes().map(function (p) { return p[cle]; }));
   }
 
-  function classe(valeur) {
-    var s = etat.seuils;
-    if (valeur === null || valeur === undefined || !s.length) return -1;
-    for (var i = NB_CLASSES - 1; i >= 1; i--) {
-      if (valeur >= s[i] && s[i] > s[0]) return i;
-    }
-    return 0;
-  }
-
-  function couleur(valeur) {
-    var c = classe(valeur);
-    return c < 0 ? COULEUR_INDISPO : COULEURS[c];
-  }
+  function couleur(valeur) { return CVF.couleur(valeur, etat.seuils); }
 
   // ---------------------------------------------------------------- carte
 
-  var carte = L.map("carte", { zoomSnap: 0.25, minZoom: 4, maxZoom: 18, attributionControl: true });
-  carte.setView([46.6, 2.4], 5.75);
-
-  // Fond OpenStreetMap, passé en gris (classe CSS « fond-gris ») pour laisser la couleur aux données.
-  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19, className: "fond-gris",
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">contributeurs OpenStreetMap</a>'
-  }).addTo(carte);
-
-  carte.createPane("calqueCyclOSM");
-  carte.getPane("calqueCyclOSM").style.zIndex = 450;
-  etat.calqueCyclOSM = L.tileLayer("https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm-lite/{z}/{x}/{y}.png", {
-    subdomains: "abc", maxZoom: 18, pane: "calqueCyclOSM",
-    attribution: 'Pistes : <a href="https://www.cyclosm.org">CyclOSM</a>'
-  });
+  var carte = CVF.creerCarte("carte");
 
   /* Plus on zoome, plus les aplats s'effacent, pour laisser voir le plan et les pistes CyclOSM. */
   function opaciteAplat() {
@@ -559,14 +506,7 @@
 
   // ---------------------------------------------------------------- ville
 
-  var fichiersDep = {};
-  function fichierDep(chemin) {
-    if (!fichiersDep[chemin]) {
-      fichiersDep[chemin] = fetch("data/" + chemin).then(function (r) { if (!r.ok) throw new Error(chemin); return r.json(); });
-      fichiersDep[chemin].catch(function () { delete fichiersDep[chemin]; });
-    }
-    return fichiersDep[chemin];
-  }
+  var fichierDep = CVF.fichier;
 
   var SEUIL_RANG = 2000; // habitants : en dessous, les rangs par habitant n'ont pas de sens
 
@@ -762,86 +702,7 @@
 
   var rechercheVille = null;
 
-  // ---------------------------------------------------------------- calque VLS
-
-  function activerVLS(actif) {
-    if (!actif) { if (etat.calqueVLS) carte.removeLayer(etat.calqueVLS); return; }
-    if (etat.calqueVLS) { carte.addLayer(etat.calqueVLS); return; }
-    $("vls-info").textContent = "Chargement des stations…";
-    fetch("data/stations.json").then(function (r) {
-      if (!r.ok) throw new Error(r.status);
-      return r.json();
-    }).then(function (donnees) {
-      var groupe = L.markerClusterGroup({
-        chunkedLoading: true, showCoverageOnHover: false, maxClusterRadius: 50,
-        iconCreateFunction: function (c) {
-          var n = c.getChildCount();
-          var taille = n < 100 ? 34 : n < 1000 ? 42 : 50;
-          return L.divIcon({ html: "<span>" + n + "</span>", className: "cluster-vls",
-            iconSize: [taille, taille] });
-        }
-      });
-      var marqueurs = donnees.stations.map(function (s) {
-        var m = L.circleMarker([s[0], s[1]], { radius: 6, color: "#ffffff", weight: 1.5,
-          fillColor: "#0e7c5a", fillOpacity: 1 });
-        var velos = s[3] == null ? "disponibilité inconnue"
-          : s[3] + (s[3] > 1 ? " vélos disponibles" : " vélo disponible");
-        if (s[5] === 1) m.setStyle({ fillColor: "#ffffff", color: "#0e7c5a", weight: 2 });
-        m.bindPopup("<strong>" + echapper(s[2] || "Station") + "</strong><br>" +
-          (s[5] === 1 ? "Zone de stationnement d'un service en free-floating<br>" : "") + echapper(velos) +
-          "<br><small>" + echapper(donnees.systemes[s[4]] || "") + "</small>");
-        return m;
-      });
-      groupe.addLayers(marqueurs);
-      etat.calqueVLS = groupe;
-      if ($("calque-vls").checked) carte.addLayer(groupe);
-      $("vls-info").textContent = new Intl.NumberFormat("fr-FR").format(marqueurs.length) +
-        " stations, regroupées par secteur ; zoomez pour les détailler.";
-    }).catch(function () {
-      $("vls-info").textContent = "Stations indisponibles pour le moment.";
-      $("calque-vls").checked = false;
-    });
-  }
-
-  // ---------------------------------------------------------------- calque stationnement (OSM)
-
-  var ZOOM_STAT = 11;
-  var statCharges = {};       // département -> true quand ses points sont dans le calque
-
-  function nomsValeur(f, champ, i) { return i >= 0 ? f.valeurs[champ][i] : null; }
-
-  function popupStationnement(f, p) {
-    var k = {}; f.champs.forEach(function (c, i) { k[c] = p[i]; });
-    var accroche = nomsValeur(f, "accroche", k.accroche), protection = nomsValeur(f, "protection", k.protection);
-    var oui = function (v) { return v === 1 ? "oui" : v === 0 ? "non" : "non renseigné"; };
-    var secu = accroche === "cadre" || accroche === "cadre et roue";
-    var lignes = [
-      "Capacité : " + (k.capacite != null ? k.capacite + " place" + (k.capacite > 1 ? "s" : "") : "non renseignée") +
-        (k.capacite_cargo ? " (dont " + k.capacite_cargo + " vélo-cargo)" : ""),
-      "Accroche : " + (accroche || "non renseignée"),
-      nomsValeur(f, "mobilier", k.mobilier) ? "Mobilier : " + nomsValeur(f, "mobilier", k.mobilier) : null,
-      protection && protection.indexOf("ferm") >= 0 ? "Fermé : " + protection : null,
-      "Couvert : " + oui(k.couverture) + ", surveillé : " + oui(k.surveillance) + ", gratuit : " + oui(k.gratuit),
-      nomsValeur(f, "acces", k.acces) ? "Accès : " + nomsValeur(f, "acces", k.acces) : null
-    ];
-    return "<strong>" + (secu ? "Stationnement sécurisé" : "Stationnement vélo") + "</strong><br>" +
-      lignes.filter(Boolean).map(echapper).join("<br>") +
-      "<br><small>© les contributeurs d'OpenStreetMap sous licence ODbL</small>";
-  }
-
-  function calqueStationnement() {
-    if (!etat.calqueStat) {
-      etat.calqueStat = L.markerClusterGroup({
-        chunkedLoading: true, showCoverageOnHover: false, maxClusterRadius: 45, disableClusteringAtZoom: 17,
-        attribution: "Stationnement : © les contributeurs d'OpenStreetMap sous licence ODbL",
-        iconCreateFunction: function (c) {
-          var n = c.getChildCount(), taille = n < 100 ? 30 : n < 1000 ? 38 : 46;
-          return L.divIcon({ html: "<span>" + n + "</span>", className: "cluster-stat", iconSize: [taille, taille] });
-        }
-      });
-    }
-    return etat.calqueStat;
-  }
+  var calques = null;   // calques et bascules (js/commun.js), créés au démarrage
 
   /* Départements visibles à l'écran (et celui de la ville choisie) */
   function departementsVisibles() {
@@ -851,119 +712,6 @@
     });
     if (etat.ville) deps.push(RechercheVille.departement(etat.ville));
     return deps.filter(function (d, i) { return deps.indexOf(d) === i; });
-  }
-
-  function majStationnement() {
-    if (!$("calque-stationnement").checked) return;
-    var info = $("stat-info");
-    if (carte.getZoom() < ZOOM_STAT) {
-      info.textContent = "Zoomez sur une ville pour afficher les emplacements.";
-      return;
-    }
-    var aCharger = departementsVisibles().filter(function (d) { return !statCharges[d]; }).slice(0, 4);
-    if (!aCharger.length) { info.textContent = "Emplacements affichés. Cliquez sur un point pour le détail."; return; }
-    info.textContent = "Chargement des emplacements…";
-    Promise.all(aCharger.map(function (dep) {
-      statCharges[dep] = true;
-      return fichierDep("stationnement/" + dep + ".json").then(function (f) {
-        var ia = f.champs.indexOf("accroche");
-        var marqueurs = f.points.map(function (p) {
-          var acc = nomsValeur(f, "accroche", p[ia]);
-          var secu = acc === "cadre" || acc === "cadre et roue";
-          var m = L.circleMarker([p[0], p[1]], secu
-            ? { radius: 6, color: "#ffffff", weight: 1.5, fillColor: "#1f2a2e", fillOpacity: 1 }
-            : { radius: 5, color: "#1f2a2e", weight: 1.5, fillColor: "#ffffff", fillOpacity: 1 });
-          m.bindPopup(function () { return popupStationnement(f, p); });
-          return m;
-        });
-        calqueStationnement().addLayers(marqueurs);
-      }).catch(function () { delete statCharges[dep]; });
-    })).then(function () {
-      info.textContent = "Emplacements affichés. Cliquez sur un point pour le détail.";
-    });
-  }
-
-  function activerStationnement(actif) {
-    if (!actif) { if (etat.calqueStat) carte.removeLayer(etat.calqueStat); $("stat-info").textContent = "Visible en zoomant sur une ville."; return; }
-    carte.addLayer(calqueStationnement());
-    majStationnement();
-  }
-
-  // ---------------------------------------------------------------- lieux à visiter
-
-  // Couleurs catégorielles validées (outil dataviz) ; le pictogramme porte aussi la catégorie.
-  var POI_COULEURS = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6"];
-  var POI_PICTOS = [
-    '<path d="M3 13h10M4 6h8M5 6v6M8 6v6M11 6v6M3 6l5-3 5 3" />',                 // musée : colonnes
-    '<path d="M3 13V6l2-1v2l2-1v2l2-1V6l2-1v8M3 13h10" />',                        // monument : créneaux
-    '<path d="M8 2v3M6.5 3.5h3M4 13V8l4-3 4 3v5M7 13v-3h2v3" />',                    // patrimoine : chapelle
-    '<path d="M8 13v-3M8 10c-3 0-4-2-4-4 0-2 2-4 4-4s4 2 4 4c0 2-1 4-4 4z" />',     // parc : arbre
-    '<path d="M2 13l4-7 3 4 2-3 3 6z" />',                                         // nature : montagne
-    '<circle cx="4.5" cy="10.5" r="2.5"/><circle cx="11.5" cy="10.5" r="2.5"/><path d="M4.5 10.5L7 6h3l1.5 4.5M7 6l1 4.5" />', // vélo
-    '<path d="M10 3a3 3 0 0 0-3 4L3 11l2 2 4-4a3 3 0 0 0 4-3l-2 1-1-1 1-2z" />'      // clé
-  ];
-
-  function iconePoi(cat) {
-    return L.divIcon({ className: "icone-poi", iconSize: [26, 26], iconAnchor: [13, 13], popupAnchor: [0, -12],
-      html: '<span style="background:' + POI_COULEURS[cat] + '"><svg viewBox="0 0 16 16" aria-hidden="true">' +
-            POI_PICTOS[cat] + "</svg></span>" });
-  }
-
-  var poiCharges = {};
-
-  function popupPoi(f, p) {
-    var k = {}; f.champs.forEach(function (c, i) { k[c] = p[i]; });
-    var lien = k.lien && /^https?:\/\//.test(k.lien) ? '<br><a href="' + echapper(k.lien) + '" target="_blank" rel="noopener">En savoir plus</a>' : "";
-    return "<strong>" + echapper(k.nom) + "</strong><br>" + echapper(f.categories[k.categorie]) +
-      (k.statut ? ", " + echapper(k.statut) : "") +
-      (k.description ? '<br><span class="desc-poi">' + echapper(k.description) + "</span>" : "") + lien +
-      "<br><small>Source : " + echapper(f.sources[k.source]) + "</small>";
-  }
-
-  function calquePoi() {
-    if (!etat.calquePoi) {
-      etat.calquePoi = L.markerClusterGroup({
-        chunkedLoading: true, showCoverageOnHover: false, maxClusterRadius: 50, disableClusteringAtZoom: 16,
-        attribution: "Lieux : DATAtourisme, Ministère de la Culture (Mérimée, Muséofile, jardins remarquables), Wikidata",
-        iconCreateFunction: function (c) {
-          var n = c.getChildCount(), taille = n < 100 ? 30 : n < 1000 ? 38 : 46;
-          return L.divIcon({ html: "<span>" + n + "</span>", className: "cluster-poi", iconSize: [taille, taille] });
-        }
-      });
-    }
-    return etat.calquePoi;
-  }
-
-  function chargerPoi(dep) {
-    if (poiCharges[dep]) return poiCharges[dep];
-    poiCharges[dep] = fichierDep("poi/" + dep + ".json").then(function (f) {
-      calquePoi().addLayers(f.points.map(function (p) {
-        var m = L.marker([p[0], p[1]], { icon: iconePoi(p[3]), title: p[2], keyboard: true });
-        m.bindPopup(function () { return popupPoi(f, p); });
-        m._cle = p[0] + "," + p[1] + "," + p[2];
-        return m;
-      }));
-      return f;
-    });
-    poiCharges[dep].catch(function () { delete poiCharges[dep]; });
-    return poiCharges[dep];
-  }
-
-  function majPoi() {
-    if (!$("calque-poi").checked) return;
-    var info = $("poi-info");
-    if (carte.getZoom() < ZOOM_STAT && !etat.ville) { info.textContent = "Zoomez sur une ville pour afficher les lieux."; return; }
-    var deps = departementsVisibles().slice(0, 4);
-    info.textContent = "Chargement des lieux…";
-    Promise.all(deps.map(function (d) { return chargerPoi(d).catch(function () { return null; }); })).then(function () {
-      info.textContent = "Cliquez sur un lieu pour le détail.";
-    });
-  }
-
-  function activerPoi(actif) {
-    if (!actif) { if (etat.calquePoi) carte.removeLayer(etat.calquePoi); $("poi-info").textContent = "Visibles en zoomant sur une ville."; return; }
-    carte.addLayer(calquePoi());
-    majPoi();
   }
 
   /* Priorité des « incontournables » : musées de France, monuments classés, puis le reste par catégorie */
@@ -989,30 +737,17 @@
       var html = '<p class="note-ville">' + compte.map(function (n, i) {
         return n ? f.categories[i] + " : " + n : null; }).filter(Boolean).join(" ; ") + ".</p><ul class=\"liste-lieux\">";
       lieux.slice(0, 8).forEach(function (k, i) {
-        html += '<li><button type="button" data-i="' + i + '"><i style="background:' + POI_COULEURS[k.categorie] + '" aria-hidden="true"></i>' +
+        html += '<li><button type="button" data-i="' + i + '"><i style="background:' + calques.POI_COULEURS[k.categorie] + '" aria-hidden="true"></i>' +
           '<span class="nom-lieu">' + echapper(k.nom) + '</span><span class="cat-lieu">' + echapper(f.categories[k.categorie]) +
           (k.statut ? ", " + echapper(k.statut) : "") + "</span></button></li>";
       });
       cible.innerHTML = html + "</ul>" + (lieux.length > 8 ? '<p class="note-ville">Activez le calque « Lieux à visiter » pour voir les ' + lieux.length + " lieux.</p>" : "");
       cible.querySelectorAll("button[data-i]").forEach(function (b) {
         b.addEventListener("click", function () {
-          var k = lieux[Number(b.getAttribute("data-i"))];
-          if (!$("calque-poi").checked) { $("calque-poi").checked = true; activerPoi(true); }
-          chargerPoi(dep).then(function () {
-            var cle = k.brut[0] + "," + k.brut[1] + "," + k.brut[2], cible = null;
-            calquePoi().eachLayer(function (m) { if (m._cle === cle) cible = m; });
-            if (cible) calquePoi().zoomToShowLayer(cible, function () { cible.openPopup(); });
-          });
+          calques.montrerLieu(dep, lieux[Number(b.getAttribute("data-i"))].brut);
         });
       });
     }).catch(function () { cible.innerHTML = '<p class="indispo">Lieux indisponibles.</p>'; });
-  }
-
-  function legendePoi() {
-    var noms = ["Musée", "Monument historique", "Patrimoine", "Parc ou jardin", "Nature", "Itinéraire vélo", "Location, réparation"];
-    $("legende-poi").innerHTML = noms.map(function (n, i) {
-      return '<span><i style="background:' + POI_COULEURS[i] + '" aria-hidden="true"></i>' + n + "</span>";
-    }).join("");
   }
 
   // ---------------------------------------------------------------- démarrage
@@ -1066,6 +801,9 @@
     etat.geo = res[1];
     remplirSelecteurs();
     dessinerDepartements();
+    calques = CVF.creerCalques(carte, { departementsVisibles: departementsVisibles,
+                                        villeActive: function () { return !!etat.ville; },
+                                        legendes: $("legendes-calques") });
     afficherMaj();
 
     rechercheVille = RechercheVille.attacher($("recherche-ville"), $("suggestions-ville"), function (v) {
@@ -1084,14 +822,6 @@
     $("choix-region").addEventListener("change", function (e) { choisirRegion(e.target.value, true); });
     $("onglet-haut").addEventListener("click", function () { choisirOnglet("haut"); });
     $("onglet-bas").addEventListener("click", function () { choisirOnglet("bas"); });
-    $("calque-vls").addEventListener("change", function (e) { activerVLS(e.target.checked); });
-    $("calque-stationnement").addEventListener("change", function (e) { activerStationnement(e.target.checked); });
-    $("calque-poi").addEventListener("change", function (e) { activerPoi(e.target.checked); });
-    carte.on("moveend", function () { majStationnement(); majPoi(); });
-    legendePoi();
-    $("calque-cyclosm").addEventListener("change", function (e) {
-      if (e.target.checked) etat.calqueCyclOSM.addTo(carte); else carte.removeLayer(etat.calqueCyclOSM);
-    });
   }).catch(function (e) {
     if (window.console) console.error(e);
     erreur("Les données n'ont pas pu être chargées. Elles sont générées automatiquement chaque jour : réessayez dans quelques minutes.");

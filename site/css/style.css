@@ -142,10 +142,6 @@ input[type="search"] {
 
 /* ---------- Calques ---------- */
 
-.calques { display: flex; flex-direction: column; gap: 8px; }
-.calques label { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
-.calques input { width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--vert); }
-.calques small { display: block; color: var(--encre-douce); font-size: 0.82rem; }
 
 /* ---------- Fiche département ---------- */
 
@@ -288,12 +284,56 @@ input[type="search"] {
   .resume-region { order: 4; }
   .fiche-ville { order: 4; }
   .fiche { order: 4; }
-  .calques-section { order: 5; }
+  .legendes-calques { order: 3; }
   .classement-section { order: 6; }
   .pied { order: 7; }
   .panneau > section { padding: 14px 16px; }
   .entete h1 { font-size: 1.3rem; }
 }
+
+/* ---------- Bandeau de navigation commun (accueil, statistiques, méthode) ---------- */
+
+.bandeau {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  padding: 12px 24px; background: var(--surface); border-bottom: 1px solid var(--trait);
+}
+.marque { font-weight: 700; font-size: 1.15rem; color: var(--encre); text-decoration: none; }
+.marque .pastille {
+  display: inline-block; width: 0.62em; height: 0.62em; border-radius: 50%;
+  background: var(--vert); margin-right: 0.35em;
+}
+.bandeau nav { display: flex; gap: 4px; flex-wrap: wrap; }
+.bandeau nav a {
+  color: var(--encre-douce); text-decoration: none; padding: 6px 10px; border-radius: 4px;
+}
+.bandeau nav a:hover { color: var(--encre); background: var(--fond); }
+.bandeau nav a[aria-current="page"] { color: var(--encre); font-weight: 700; box-shadow: inset 0 -3px 0 var(--vert); border-radius: 0; }
+
+/* ---------- Bascules des calques : flottantes sur la carte, toujours visibles (deux cartes) ---------- */
+
+.bascules { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.leaflet-control.bascules { margin-top: 10px; margin-right: 10px; }
+.bascule {
+  display: inline-flex; align-items: center; gap: 7px; min-height: 40px; padding: 6px 13px 6px 10px;
+  border-radius: 999px; border: 1px solid #b9c6c2; background: #ffffff; color: var(--encre);
+  font: inherit; font-size: 0.85rem; font-weight: 700; line-height: 1.1; cursor: pointer;
+  box-shadow: 0 1px 4px rgba(31, 42, 46, 0.18);
+}
+.bascule svg { width: 20px; height: 20px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.7;
+  stroke-linecap: round; stroke-linejoin: round; }
+.bascule:hover { border-color: var(--vert-fonce); }
+.bascule[aria-pressed="true"] { background: var(--vert-fonce); border-color: var(--vert-fonce); color: #ffffff; }
+.bascule:focus-visible { outline: 3px solid #f2a900; outline-offset: 2px; }
+/* Calque actif mais rien à voir à ce niveau de zoom : petit point d'attente (détail dans l'infobulle) */
+.bascule.en-attente::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #f2c14e; flex: none; }
+@media (max-width: 640px) {
+  .bascule { min-height: 44px; padding: 6px 11px 6px 9px; font-size: 0.8rem; }
+  .leaflet-control.bascules { margin-top: 8px; margin-right: 8px; gap: 5px; }
+}
+
+.legendes-calques { font-size: 0.85rem; color: var(--encre-douce); }
+.legendes-calques .legende-calque { margin: 0; }
+.legendes-calques .legende-calque + .legende-calque { margin-top: 8px; }
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; scroll-behavior: auto !important; }

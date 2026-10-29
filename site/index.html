@@ -4,7 +4,17 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Carte Vélo France</title>
-  <meta name="description" content="Carte interactive des départements français : aménagements cyclables, vélos en libre-service et score vélo, à partir des données ouvertes.">
+  <meta name="description" content="Où fait-il bon pédaler en France ? Score vélo des départements et des villes, aménagements cyclables et vélos en libre-service.">
+  <script>
+    /* Anciens liens partagés : une adresse avec des réglages de la carte détaillée (indicateur, région,
+       département, arrondissement) ouvre la carte détaillée, comme avant. */
+    (function () {
+      var h = new URLSearchParams(location.hash.slice(1)), q = new URLSearchParams(location.search);
+      if (h.has("ind") || h.has("reg") || h.has("dep") || q.has("arr")) {
+        location.replace("carte-detaillee.html" + location.search + location.hash);
+      }
+    })();
+  </script>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='7' fill='%230e7c5a'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -12,106 +22,45 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
   <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/accueil.css">
 </head>
-<body>
-  <a class="lien-evitement" href="#panneau">Aller au panneau de données</a>
+<body class="page-accueil">
+  <a class="lien-evitement" href="#recherche-ville">Aller à la recherche</a>
 
-  <div class="appli">
-    <div id="carte" role="region" aria-label="Carte des départements. Utilisez le panneau pour choisir un département au clavier."></div>
+  <header class="bandeau bandeau-accueil">
+    <a class="marque" href="./"><span class="pastille" aria-hidden="true"></span>Carte Vélo France</a>
+    <nav aria-label="Navigation principale">
+      <a href="./" aria-current="page">Carte</a>
+      <a href="carte-detaillee.html" id="lien-detail-nav">Carte détaillée</a>
+      <a href="statistiques.html">Statistiques</a>
+      <a href="methode.html">Sources et méthode</a>
+    </nav>
+  </header>
 
-    <main class="panneau" id="panneau" tabindex="-1">
-      <section class="entete">
-        <h1><span class="pastille" aria-hidden="true"></span>Carte Vélo France</h1>
-        <p>Où fait-il bon pédaler ? Aménagements cyclables et vélos en libre-service, département par département.</p>
-        <nav class="nav-panneau" aria-label="Navigation principale">
-          <a href="./" aria-current="page">Carte</a>
-          <a href="statistiques.html" id="lien-stats">Statistiques d'accidents</a>
-          <a href="methode.html">Sources et méthode</a>
-        </nav>
-      </section>
+  <main class="accueil">
+    <h1 class="visuellement-cache">Score vélo des départements et des villes</h1>
+    <div id="carte" role="region" aria-label="Carte des départements, colorés selon le score vélo"></div>
 
-      <section class="reglages">
-        <div class="champ champ-ville">
-          <label class="titre-champ" for="recherche-ville">Rechercher une ville</label>
-          <input type="search" id="recherche-ville" placeholder="Nom ou code postal" spellcheck="false">
-          <ul id="suggestions-ville" class="suggestions" hidden></ul>
-        </div>
-        <div class="champ">
-          <label class="titre-champ" for="choix-indicateur">Afficher sur la carte</label>
-          <select id="choix-indicateur"></select>
-        </div>
-        <div class="champ" id="champ-region">
-          <label class="titre-champ" for="choix-region">Filtrer par région</label>
-          <select id="choix-region"><option value="">Toute la France</option></select>
-        </div>
-        <div class="champ">
-          <label class="titre-champ" for="choix-dep">Aller à un département</label>
-          <select id="choix-dep"><option value="">Choisir…</option></select>
-        </div>
-      </section>
+    <div class="recherche-flottante champ-ville">
+      <label class="visuellement-cache" for="recherche-ville">Rechercher une ville</label>
+      <svg class="loupe" viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M13 13l4.5 4.5"/></svg>
+      <input type="search" id="recherche-ville" placeholder="Rechercher une ville" spellcheck="false" autocomplete="off">
+      <ul id="suggestions-ville" class="suggestions" hidden></ul>
+    </div>
 
-      <section class="legende" aria-live="polite">
-        <p class="legende-titre" id="legende-titre">Chargement des données…</p>
-        <div class="legende-bande" id="legende-bande" aria-hidden="true"></div>
-        <div class="legende-valeurs" id="legende-valeurs"></div>
-        <div class="legende-indispo" id="legende-indispo" hidden><i aria-hidden="true"></i>Donnée indisponible</div>
-      </section>
+    <section class="fiche-courte" id="fiche-courte" hidden aria-live="polite" tabindex="-1"></section>
 
-      <section class="fiche resume-region" id="resume-region" hidden aria-live="polite"></section>
-
-      <section class="fiche fiche-ville" id="fiche-ville" hidden aria-live="polite" tabindex="-1"></section>
-
-      <section class="fiche" id="fiche" hidden aria-live="polite" tabindex="-1"></section>
-
-      <section class="calques-section">
-        <div class="calques">
-          <label>
-            <input type="checkbox" id="calque-vls">
-            <span>Stations de vélos en libre-service
-              <small id="vls-info">Regroupées par secteur ; zoomez pour les détailler.</small></span>
-          </label>
-          <label>
-            <input type="checkbox" id="calque-stationnement">
-            <span>Stationnement vélo (OpenStreetMap)
-              <small id="stat-info">Visible en zoomant sur une ville.</small>
-              <small class="legende-stat"><i class="pt-secu" aria-hidden="true"></i>sécurisé (accroche cadre)
-                <i class="pt-simple" aria-hidden="true"></i>autre</small></span>
-          </label>
-          <label>
-            <input type="checkbox" id="calque-poi">
-            <span>Lieux à visiter à vélo
-              <small id="poi-info">Visibles en zoomant sur une ville.</small>
-              <small class="legende-poi" id="legende-poi"></small></span>
-          </label>
-          <label>
-            <input type="checkbox" id="calque-cyclosm">
-            <span>Pistes et bandes cyclables (CyclOSM)
-              <small>Visibles en zoomant sur une ville.</small></span>
-          </label>
-        </div>
-      </section>
-
-      <section class="classement-section">
-        <h2 class="classement-titre" id="classement-titre">Classement</h2>
-        <div class="onglets" role="tablist" aria-label="Partie du classement">
-          <button role="tab" id="onglet-haut" aria-selected="true" aria-controls="classement">10 premiers départements</button>
-          <button role="tab" id="onglet-bas" aria-selected="false" aria-controls="classement">10 premières communes</button>
-        </div>
-        <ol class="classement" id="classement" role="tabpanel"></ol>
-        <p class="classement-note" id="classement-note" hidden></p>
-      </section>
-
-      <section class="pied">
-        <p id="maj">Mise à jour des données : …</p>
-        <p><a href="methode.html">Sources et méthode</a></p>
-        <p><a href="https://github.com/floriansilvestre67/Carte-velo-France">Code source sur GitHub</a></p>
-      </section>
-    </main>
-  </div>
+    <div class="legende-simple" id="legende-simple" aria-live="polite">
+      <p class="legende-titre">Score vélo</p>
+      <div class="legende-bande" id="legende-bande" aria-hidden="true"></div>
+      <div class="legende-valeurs"><span>moins</span><span>plus</span></div>
+    </div>
+  </main>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
   <script src="js/ville.js"></script>
-  <script src="js/app.js"></script>
+  <script src="js/commun.js"></script>
+  <script src="js/accueil.js"></script>
 </body>
 </html>

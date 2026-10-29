@@ -1,20 +1,4 @@
-/* Page « Statistiques » et bandeau de navigation commun */
-
-.bandeau {
-  display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
-  padding: 12px 24px; background: var(--surface); border-bottom: 1px solid var(--trait);
-}
-.marque { font-weight: 700; font-size: 1.15rem; color: var(--encre); text-decoration: none; }
-.marque .pastille {
-  display: inline-block; width: 0.62em; height: 0.62em; border-radius: 50%;
-  background: var(--vert); margin-right: 0.35em;
-}
-.bandeau nav { display: flex; gap: 4px; flex-wrap: wrap; }
-.bandeau nav a {
-  color: var(--encre-douce); text-decoration: none; padding: 6px 10px; border-radius: 4px;
-}
-.bandeau nav a:hover { color: var(--encre); background: var(--fond); }
-.bandeau nav a[aria-current="page"] { color: var(--encre); font-weight: 700; box-shadow: inset 0 -3px 0 var(--vert); border-radius: 0; }
+/* Page « Statistiques » (le bandeau de navigation commun est dans style.css) */
 
 /* Filtres : une rangée, collée en haut */
 .filtres {

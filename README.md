@@ -2,11 +2,12 @@
 
 Carte interactive de la France métropolitaine montrant où le vélo est le mieux servi : aménagements cyclables, vélos en libre-service (VLS), stationnement vélo, lieux à visiter, accidents de vélo et un « score vélo » sur 100. On peut descendre au niveau de chaque ville. Toutes les données sont ouvertes et recalculées chaque jour.
 
-- **Carte** : départements colorés selon l'indicateur choisi, filtre par région, recherche de ville (nom ou code postal) avec fiche détaillée, calques des stations VLS, du stationnement, des lieux à visiter et des pistes CyclOSM.
+- **Carte** (page d'accueil, grand public) : départements colorés selon un score vélo simple (km d'aménagements et stations de vélos en libre-service, rapportés à la population), recherche de ville, fiche courte avec le classement, et quatre calques à activer.
+- **Carte détaillée** : tous les indicateurs, filtres par région et département, classements, fiche Ville complète et les mêmes calques.
 - **Statistiques** : accidents de vélo par zone (France, région, département, ville) et par période, avec graphiques, ratios et corrélations.
 - **Sources et méthode** : origine de chaque donnée, définitions, limites et état du dernier calcul.
 
-Une ville se partage par son code INSEE dans l'adresse, sur les deux pages : `?ville=63113`.
+Une ville se partage par son code INSEE dans l'adresse, sur toutes les pages : `?ville=63113`. Les anciens liens de la carte (avec `#ind=`, `#reg=`, `#dep=` ou `?arr=`) ouvrent automatiquement la carte détaillée.
 
 Site : https://floriansilvestre67.github.io/Carte-velo-France/
 
@@ -61,16 +62,19 @@ scripts/
     poi.py                lieux à visiter (DATAtourisme, Mérimée, Muséofile, jardins remarquables, Wikidata)
 tests/                    tests sur données fictives au format réel
 site/
-  index.html              la carte
+  index.html              la carte d'accueil, simplifiée
+  carte-detaillee.html    la carte détaillée
   statistiques.html       la page Statistiques (accidents)
   methode.html            page « Sources et méthode »
-  css/style.css, css/statistiques.css
-  js/app.js               carte, fiche Ville, calques
+  css/style.css, css/accueil.css, css/statistiques.css
+  js/commun.js            code commun aux deux cartes : formats, fond de carte, calques et leurs bascules
+  js/accueil.js           carte d'accueil (score simplifié, fiche courte)
+  js/app.js               carte détaillée, fiche Ville
   js/ville.js             recherche de ville (commune aux deux pages)
   js/statistiques.js      graphiques (Chart.js) et filtres
   js/methode.js
   data/                   généré par GitHub Actions (non versionné)
-    departements.geojson, meta.json, stations.json, communes-index.json
+    departements.geojson, meta.json, stations.json, communes-index.json, classement-communes.json
     accidents/national.json
     communes/{dép}.json, contours/{dép}.geojson, stationnement/{dép}.json, poi/{dép}.json
 ```
