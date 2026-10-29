@@ -190,35 +190,32 @@ def test_classement_communes(monde):
     assert l63["km_10k_hab"] == pytest.approx(l63["km_total"] / l63["pop"] * 1e4, rel=1e-3)
 
 
-def test_score_simple(monde):
+def test_score_communes(monde):
     meta, props, _, sortie = lancer(monde)
-    # Départements : deux ratios, rangs centiles, rang avec ex æquo ; le score complet ne change pas
-    for p in props.values():
-        assert "score" in p and p["score_simple"] is None or 0 <= p["score_simple"] <= 100
-    classes = [p for p in props.values() if p["score_simple"] is not None]
-    meilleur = min(classes, key=lambda p: p["rang_score_simple"])
-    assert meilleur["rang_score_simple"] == 1
-    assert meilleur["score_simple"] == max(p["score_simple"] for p in classes)
-    assert all(p["nb_classes_score_simple"] == len(classes) for p in props.values())
-    # Communes : score, rang, ex æquo dans les fiches ; commune sans population non classée
+    # Communes : même score (6 indicateurs) partout, rang national et ex æquo dans les fiches
     f63 = json.loads((sortie / "communes" / "63.json").read_text(encoding="utf-8"))
-    sur = f63["score_simple"]["sur"]
+    sur = f63["score_communes"]["sur"]
     c = f63["communes"]
-    assert "ss" not in c["99999"]
-    notes = [v for v in c.values() if "ss" in v]
-    assert notes and all(1 <= v["rs"] <= sur and 0 <= v["ss"] <= 100 and v["eq"] >= 1 for v in notes)
-    # Le rang est cohérent avec le score : un meilleur score a un meilleur rang
-    a, b = sorted(notes, key=lambda v: -v["ss"])[:2]
-    assert a["rs"] <= b["rs"]
+    assert "sc" not in c["99999"]                      # sans population : non classée
+    notes = [v for v in c.values() if "sc" in v]
+    assert notes and all(1 <= v["rg"] <= sur and 0 <= v["sc"] <= 100 and v["eq"] >= 1 for v in notes)
+    a, b = sorted(notes, key=lambda v: -v["sc"])[:2]
+    assert a["rg"] <= b["rg"]
+    # Le classement des communes de la carte détaillée reprend exactement ce score
+    cl = json.loads((sortie / "classement-communes.json").read_text(encoding="utf-8"))
+    lignes = {l[0]: dict(zip(cl["champs"], l)) for l in cl["lignes"]}
+    assert lignes["63012"]["score"] == c["63012"]["sc"]
+    # Départements : le score de la carte détaillée, inchangé
+    assert all("score_simple" not in p for p in props.values())
 
 
 def test_rangs_rapides_et_plancher():
     assert indicateurs.rangs_rapides({"a": 3, "b": 5, "c": 3, "d": None}) == {"a": (2, 2), "b": (1, 1), "c": (2, 2), "d": None}
     # Hameau de 30 habitants avec 1 km : ramené à 10 000 habitants, il ne dépasse pas une ville bien équipée
-    r = indicateurs.score_simple_communes({
-        "hameau": {"p": 30, "km": {"t": 1}, "vls": {"st": 0}},
-        "ville": {"p": 100_000, "km": {"t": 300}, "vls": {"st": 50}},
-        "vide": {"p": 500, "km": {"t": 0}, "vls": {"st": 0}},
-        "sans_donnee": {"p": 800, "km": None, "vls": {"st": 0}}})
+    r = indicateurs.score_communes({
+        "hameau": {"p": 30, "s": 2, "km": {"t": 1}, "vls": {"st": 0, "v": 0}},
+        "ville": {"p": 100_000, "s": 40, "km": {"t": 300}, "vls": {"st": 50, "v": 400}},
+        "vide": {"p": 500, "s": 10, "km": {"t": 0}, "vls": {"st": 0, "v": 0}},
+        "sans_donnee": {"p": 800, "s": 5, "km": None, "vls": {"st": 0, "v": 0}}})
     assert r["sur"] == 3 and "sans_donnee" not in r["communes"]
     assert r["communes"]["ville"][1] == 1 and r["communes"]["hameau"][1] == 2

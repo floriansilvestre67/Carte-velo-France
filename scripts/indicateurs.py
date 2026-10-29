@@ -108,13 +108,12 @@ INDICATEURS_COMMUNES = ["score", "km_total", "km_10k_hab", "km_par_km2", "km_pis
                         "vls_stations_100k", "stat_places", "stat_places_secu", "stat_secu_1000"]
 
 
-def calculer_communes(fiches: dict[str, dict], seuil_population: int) -> dict:
-    """Indicateurs et score vélo des communes d'au moins `seuil_population` habitants.
+def calculer_communes(fiches: dict[str, dict], seuil_population: int, scores_nationaux: dict) -> dict:
+    """Indicateurs des communes d'au moins `seuil_population` habitants (onglet « 10 premières communes »).
 
     fiches : {code: fiche publiée dans communes/{dep}.json, plus "d" (département)}.
-    Le score suit la même méthode que celui des départements (moyenne des rangs centiles des
-    6 indicateurs de SCORE_INDICATEURS), mais calculée entre ces communes seulement : les très
-    petites communes, où un seul kilomètre change tout, en sont écartées.
+    scores_nationaux : {code: [score, rang, ex æquo]} calculés par score_communes entre toutes les
+    communes, pour que chaque commune ait le même score sur les deux cartes.
     Les stations VLS sont les vraies stations (les zones virtuelles du free-floating ne comptent pas).
     """
     lignes = {}
@@ -133,11 +132,9 @@ def calculer_communes(fiches: dict[str, dict], seuil_population: int) -> dict:
         d["km_par_km2"] = ratio(d["km_total"], f.get("s"))
         d["vls_stations_100k"] = ratio(d["vls_stations"], pop, 100_000)
         lignes[code] = d
-    centiles = {cle: rangs_centiles({c: d.get(cle) for c, d in lignes.items()}) for cle in SCORE_INDICATEURS}
+    # Score : celui de toutes les communes (score_communes), le même que sur la carte d'accueil
     for c, d in lignes.items():
-        notes = [centiles[cle][c] for cle in SCORE_INDICATEURS if centiles[cle][c] is not None]
-        # Score seulement si les 6 indicateurs sont connus (sinon la comparaison serait faussée)
-        d["score"] = sum(notes) / len(notes) if len(notes) == len(SCORE_INDICATEURS) else None
+        d["score"] = (scores_nationaux.get(c) or [None])[0]
     champs = ["code", "nom", "dep", "pop"] + INDICATEURS_COMMUNES
     sortie = []
     for c, d in lignes.items():
@@ -148,24 +145,14 @@ def calculer_communes(fiches: dict[str, dict], seuil_population: int) -> dict:
 
 
 # --------------------------------------------------------------------------
-# Score vélo « simplifié » (carte d'accueil). Nom interne : score_simple, pour ne pas le confondre
-# avec le score vélo complet de la carte détaillée ; sur le site, les deux s'appellent « score vélo ».
+# Score vélo des communes (même score sur la carte d'accueil et sur la carte détaillée)
 # --------------------------------------------------------------------------
-# Il ne repose que sur les deux données montrées sur la carte d'accueil, rapportées à la population
-# pour comparer des territoires de tailles différentes :
-#   - km d'aménagements cyclables pour 10 000 habitants ;
-#   - stations de vélos en libre-service pour 100 000 habitants (vraies stations, sans les zones
-#     virtuelles du free-floating).
-# Méthode identique au score complet : rang centile (0 à 100) sur chaque ratio, puis moyenne.
-# Pour les communes, la population retenue au dénominateur est d'au moins PLANCHER_POPULATION
-# habitants (même seuil que les classements et corrélations du site) : sinon un hameau traversé par
-# une voie verte, ou doté d'une seule station, passerait devant les grandes villes cyclables
-# (1 km pour 30 habitants = 333 km pour 10 000 habitants). Mesuré sur les vraies données : avec un
-# plancher de 2 000 habitants, le haut du classement restait occupé par des villages dotés d'une
-# seule station (95 % des communes n'en ont aucune) ; avec 10 000, ce sont des villes et des bourgs
-# bien équipés, et les grandes villes cyclables remontent.
+# Même méthode et mêmes six indicateurs que pour les départements (SCORE_INDICATEURS), calculés
+# entre toutes les communes de métropole. Pour les deux ratios par habitant, la population retenue
+# est d'au moins PLANCHER_POPULATION habitants (le seuil déjà utilisé par les classements du site) :
+# sinon un hameau traversé par une voie verte ou doté d'une seule station passerait devant les
+# grandes villes cyclables (1 km pour 30 habitants = 333 km pour 10 000 habitants).
 
-SCORE_SIMPLE_INDICATEURS = ["km_10k_hab", "vls_stations_100k"]
 PLANCHER_POPULATION = 10_000
 
 
@@ -180,47 +167,26 @@ def rangs_rapides(valeurs: dict[str, float | None]) -> dict[str, tuple[int, int]
     return {k: (None if v is None else (premier[v], effectif[v])) for k, v in valeurs.items()}
 
 
-def _score_simple(ratios: dict[str, dict[str, float | None]]) -> dict[str, float | None]:
-    """ratios : {code: {"km_10k_hab": x, "vls_stations_100k": y}} -> {code: score sur 100}.
-    Score seulement si les deux ratios sont connus (une commune sans donnée n'est pas classée)."""
-    centiles = {cle: rangs_centiles({c: r.get(cle) for c, r in ratios.items()}) for cle in SCORE_SIMPLE_INDICATEURS}
-    res = {}
-    for c in ratios:
-        notes = [centiles[cle][c] for cle in SCORE_SIMPLE_INDICATEURS]
-        res[c] = None if any(n is None for n in notes) else round(sum(notes) / len(notes), 4)
-    return res
+def indicateurs_score_commune(f: dict) -> dict[str, float | None] | None:
+    """Les six indicateurs du score pour une fiche commune, ou None s'il en manque un."""
+    pop, km, vls, surf = f.get("p"), (f.get("km") or {}).get("t"), f.get("vls"), f.get("s")
+    if not pop or km is None or vls is None or not surf:
+        return None
+    base = max(pop, PLANCHER_POPULATION)
+    return {"km_total": km, "km_10k_hab": km / base * 10_000, "km_par_km2": km / surf,
+            "vls_stations": vls.get("st", 0), "vls_velos": vls.get("v", 0),
+            "vls_stations_100k": vls.get("st", 0) / base * 100_000}
 
 
-def score_simple_departements(departements: list[dict]) -> None:
-    """Ajoute score_simple et rang_score_simple (+ ex æquo) aux propriétés des départements."""
-    ratios = {d["code"]: {"km_10k_hab": d.get("km_10k_hab"), "vls_stations_100k": d.get("vls_stations_100k")}
-              for d in departements}
-    scores = _score_simple(ratios)
-    rangs = rangs_rapides(scores)
-    for d in departements:
-        d["score_simple"] = None if scores[d["code"]] is None else float(f"{scores[d['code']]:.6g}")
-        r = rangs[d["code"]]
-        d["rang_score_simple"] = r[0] if r else None
-        d["ex_aequo_score_simple"] = bool(r and r[1] > 1)
-    d0 = [d for d in departements if d["score_simple"] is not None]
-    for d in departements:
-        d["nb_classes_score_simple"] = len(d0)
-
-
-def score_simple_communes(fiches: dict[str, dict]) -> dict:
-    """fiches : {code: {"p": population, "km": {"t": km}, "vls": {"st": stations}}}.
+def score_communes(fiches: dict[str, dict]) -> dict:
+    """Score vélo de toutes les communes, avec rang national et ex æquo.
 
     Renvoie {"sur": nombre de communes classées, "communes": {code: [score, rang, nb_ex_aequo]}}.
-    Une commune sans population, sans km connu ou sans donnée VLS n'est pas classée.
+    Une commune dont il manque une donnée (population, surface, km ou vélos en libre-service)
+    n'est pas classée.
     """
-    ratios = {}
-    for code, f in fiches.items():
-        pop, km, vls = f.get("p"), (f.get("km") or {}).get("t"), f.get("vls")
-        if not pop or km is None or vls is None:
-            continue
-        base = max(pop, PLANCHER_POPULATION)
-        ratios[code] = {"km_10k_hab": km / base * 10_000, "vls_stations_100k": vls.get("st", 0) / base * 100_000}
-    scores = _score_simple(ratios)
+    ind = {c: v for c, v in ((c, indicateurs_score_commune(f)) for c, f in fiches.items()) if v}
+    centiles = {cle: rangs_centiles({c: v[cle] for c, v in ind.items()}) for cle in SCORE_INDICATEURS}
+    scores = {c: round(sum(centiles[cle][c] for cle in SCORE_INDICATEURS) / len(SCORE_INDICATEURS), 4) for c in ind}
     rangs = rangs_rapides(scores)
-    res = {c: [round(scores[c], 1), rangs[c][0], rangs[c][1]] for c in scores if scores[c] is not None}
-    return {"sur": len(res), "communes": res}
+    return {"sur": len(scores), "communes": {c: [round(scores[c], 1), rangs[c][0], rangs[c][1]] for c in scores}}

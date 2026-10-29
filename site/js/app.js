@@ -283,7 +283,7 @@
         if (!liste.length) ol.innerHTML = '<li class="indispo">Donnée indisponible : le classement ne peut pas être établi.</li>';
         note.textContent = "Parmi les " + liste.length + " communes de plus de " +
           new Intl.NumberFormat("fr-FR").format(communes[0].seuil) + " habitants" + lieu +
-          (cle === "score" ? " ; score calculé entre ces communes." : ".");
+          (cle === "score" ? " ; score calculé entre toutes les communes de métropole, comme sur la carte d'accueil." : ".");
         note.hidden = false;
       });
       return;

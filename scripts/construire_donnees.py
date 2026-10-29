@@ -382,7 +382,6 @@ def construire(client, sortie: Path, travail: Path, url_precedent: str | None = 
     # 6. Indicateurs
     journal("6/6 Indicateurs et score…")
     liste_props = indicateurs.calculer([props[d["code"]] for d in deps])
-    indicateurs.score_simple_departements(liste_props)          # score vélo de la carte d'accueil
     par_code = {p["code"]: p for p in liste_props}
     region_de = {c: p.get("region") for c, p in par_code.items()}
 
@@ -578,20 +577,19 @@ def ecrire_accidents_et_communes(client, sortie, url_precedent, sources_meta, de
             toutes_fiches[code_com] = {**fiche, "d": dep}
         contenus[dep] = {"dep": dep, "communes": communes_dep,
                          "accidents": {"champs": accidents.CHAMPS_ENREGISTREMENT, "lignes": lignes}}
-    # Score vélo simplifié des communes (carte d'accueil) : calculé entre toutes les communes de
-    # métropole, puis rangé dans chaque fiche : ss = score, rs = rang, eq = nombre d'ex æquo
-    simple = indicateurs.score_simple_communes(toutes_fiches)
+    # Score vélo des communes : calculé entre toutes les communes de métropole, puis rangé dans
+    # chaque fiche : sc = score, rg = rang national, eq = nombre d'ex æquo (même score sur les deux cartes)
+    scores = indicateurs.score_communes(toutes_fiches)
     for dep, contenu in contenus.items():
         for code_com, fiche in contenu["communes"].items():
-            v = simple["communes"].get(code_com)
+            v = scores["communes"].get(code_com)
             if v:
-                fiche["ss"], fiche["rs"], fiche["eq"] = v
-        contenu["score_simple"] = {"sur": simple["sur"]}
+                fiche["sc"], fiche["rg"], fiche["eq"] = v
+        contenu["score_communes"] = {"sur": scores["sur"]}
         total += ecrire_json(sortie / "communes" / f"{dep}.json", contenu)
-    journal(f"  → communes/*.json ({total / 1024:.0f} Ko au total ; {simple['sur']} communes classées "
-            f"pour le score simplifié)")
+    journal(f"  → communes/*.json ({total / 1024:.0f} Ko au total ; {scores['sur']} communes classées)")
     if toutes_fiches:
-        classement = indicateurs.calculer_communes(toutes_fiches, SEUIL_GRANDES_COMMUNES)
+        classement = indicateurs.calculer_communes(toutes_fiches, SEUIL_GRANDES_COMMUNES, scores["communes"])
         taille = ecrire_json(sortie / "classement-communes.json", classement)
         journal(f"  → classement-communes.json ({len(classement['lignes'])} communes, {taille / 1024:.0f} Ko)")
 

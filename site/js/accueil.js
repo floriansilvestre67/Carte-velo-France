@@ -1,7 +1,7 @@
 /* Carte Vélo France — carte d'accueil, simplifiée (index.html).
-   Départements colorés selon le score vélo simplifié (score_simple, calculé par le pipeline à partir
-   des km d'aménagements et des stations de vélos en libre-service), recherche de ville, fiche courte
-   au clic, et les quatre calques. Le code commun avec la carte détaillée est dans js/commun.js. */
+   Départements colorés selon le score vélo (le même que sur la carte détaillée, six indicateurs ;
+   pour les communes, calculé par le pipeline entre toutes les communes de métropole), recherche
+   de ville, fiche courte au clic, et les quatre calques. Le code commun avec la carte détaillée est dans js/commun.js. */
 (function () {
   "use strict";
 
@@ -32,7 +32,7 @@
     var p = feature.properties;
     if (etat.ville) return { fillOpacity: 0, color: "#55636a", weight: 0.6, opacity: 0.35 };
     var choisi = p.code === etat.selection;
-    return { fillColor: couleur(p.score_simple), fillOpacity: opacite(), opacity: 1,
+    return { fillColor: couleur(p.score), fillOpacity: opacite(), opacity: 1,
              color: choisi ? "#1f2a2e" : "#ffffff", weight: choisi ? 3 : 0.8 };
   }
 
@@ -49,7 +49,7 @@
         couche.bindTooltip(function () {
           var p = f.properties;
           return "<strong>" + echapper(p.nom) + "</strong>" +
-            (p.score_simple != null ? "Score vélo : " + nombre(p.score_simple) + " / 100" : "<em>Score indisponible</em>");
+            (p.score != null ? "Score vélo : " + nombre(p.score) + " / 100" : "<em>Score indisponible</em>");
         }, { sticky: true, className: "info-dep", direction: "top", offset: [0, -8] });
         couche.on({
           mouseover: function () { if (!etat.ville && f.properties.code !== etat.selection) couche.setStyle({ weight: 2, color: "#1f2a2e" }); },
@@ -140,8 +140,11 @@
     if (!p) return;
     etat.selection = code;
     recolorer();
-    fiche(p.nom, "(" + p.code + ")", p.score_simple,
-          p.rang_score_simple ? texteRang(p.rang_score_simple, p.ex_aequo_score_simple, p.nb_classes_score_simple) + " départements" : null,
+    // Rang parmi les départements qui ont un score ; ex æquo si un autre a exactement le même score
+    var classes = proprietes().filter(function (q) { return q.score != null; });
+    var egaux = classes.filter(function (q) { return q.score === p.score; }).length;
+    fiche(p.nom, "(" + p.code + ")", p.score,
+          p.score != null && p.rangs && p.rangs.score ? texteRang(p.rangs.score, egaux > 1, classes.length) + " départements" : null,
           p.km_total, p.vls_stations, "carte-detaillee.html#dep=" + encodeURIComponent(code));
     $("lien-detail-nav").href = "carte-detaillee.html#dep=" + encodeURIComponent(code);
   }
@@ -176,12 +179,12 @@
       if (forme) {
         // Seule la ville est colorée (selon son score), détourée en trait gras
         etat.calqueVille = L.geoJSON(forme, { interactive: false,
-          style: { color: "#1f2a2e", weight: 4, fill: true, fillColor: couleur(c.ss), fillOpacity: 0.35 } }).addTo(carte);
+          style: { color: "#1f2a2e", weight: 4, fill: true, fillColor: couleur(c.sc), fillOpacity: 0.35 } }).addTo(carte);
         centrerSur(etat.calqueVille.getBounds(), 13);
       }
-      var sur = (f.score_simple || {}).sur;
-      fiche(c.n || code, (dep(d) || {}).nom || "", c.ss,
-            c.rs && sur ? texteRang(c.rs, c.eq > 1, sur) + " communes" : null,
+      var sur = (f.score_communes || {}).sur;
+      fiche(c.n || code, (dep(d) || {}).nom || "", c.sc,
+            c.rg && sur ? texteRang(c.rg, c.eq > 1, sur) + " communes" : null,
             c.km ? c.km.t : null, c.vls ? c.vls.st : null, "carte-detaillee.html?ville=" + encodeURIComponent(code));
       if (window.matchMedia("(max-width: 700px)").matches) $("fiche-courte").focus({ preventScroll: true });
     }).catch(function () {
@@ -212,7 +215,7 @@
           onEachFeature: function (f, couche) {
             var c = noms[f.properties.code] || {};
             couche.bindTooltip("<strong>" + echapper(c.n || f.properties.code) + "</strong>" +
-              (c.ss != null ? "Score vélo : " + nombre(c.ss) + " / 100" : "<em>Score indisponible</em>"),
+              (c.sc != null ? "Score vélo : " + nombre(c.sc) + " / 100" : "<em>Score indisponible</em>"),
               { sticky: true, className: "info-dep", direction: "top" });
             couche.on({
               mouseover: function () { couche.setStyle({ weight: 1.5, opacity: 0.8 }); },
@@ -232,7 +235,7 @@
     return r.json();
   }).then(function (geo) {
     etat.geo = geo;
-    etat.seuils = CVF.seuilsQuantiles(proprietes().map(function (p) { return p.score_simple; }));
+    etat.seuils = CVF.seuilsQuantiles(proprietes().map(function (p) { return p.score; }));
     dessinerDepartements();
     dessinerLegende();
     calques = CVF.creerCalques(carte, { departementsVisibles: departementsVisibles,

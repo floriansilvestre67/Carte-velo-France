@@ -2,7 +2,7 @@
 
 Carte interactive de la France métropolitaine montrant où le vélo est le mieux servi : aménagements cyclables, vélos en libre-service (VLS), stationnement vélo, lieux à visiter, accidents de vélo et un « score vélo » sur 100. On peut descendre au niveau de chaque ville. Toutes les données sont ouvertes et recalculées chaque jour.
 
-- **Carte** (page d'accueil, grand public) : départements colorés selon un score vélo simple (km d'aménagements et stations de vélos en libre-service, rapportés à la population), recherche de ville, fiche courte avec le classement, et quatre calques à activer.
+- **Carte** (page d'accueil, grand public) : départements colorés selon le score vélo (le même que sur la carte détaillée), recherche de ville, fiche courte avec le classement, et quatre calques à activer.
 - **Carte détaillée** : tous les indicateurs, filtres par région et département, classements, fiche Ville complète et les mêmes calques.
 - **Statistiques** : accidents de vélo par zone (France, région, département, ville) et par période, avec graphiques, ratios et corrélations.
 - **Sources et méthode** : origine de chaque donnée, définitions, limites et état du dernier calcul.
@@ -68,7 +68,7 @@ site/
   methode.html            page « Sources et méthode »
   css/style.css, css/accueil.css, css/statistiques.css
   js/commun.js            code commun aux deux cartes : formats, fond de carte, calques et leurs bascules
-  js/accueil.js           carte d'accueil (score simplifié, fiche courte)
+  js/accueil.js           carte d'accueil (fiche courte, communes cliquables)
   js/app.js               carte détaillée, fiche Ville
   js/ville.js             recherche de ville (commune aux deux pages)
   js/statistiques.js      graphiques (Chart.js) et filtres
