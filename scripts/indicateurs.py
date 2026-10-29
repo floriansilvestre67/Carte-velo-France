@@ -158,11 +158,15 @@ def calculer_communes(fiches: dict[str, dict], seuil_population: int) -> dict:
 #     virtuelles du free-floating).
 # Méthode identique au score complet : rang centile (0 à 100) sur chaque ratio, puis moyenne.
 # Pour les communes, la population retenue au dénominateur est d'au moins PLANCHER_POPULATION
-# habitants : sinon un hameau traversé par une voie verte, ou doté d'une seule station, passerait
-# devant les grandes villes cyclables (1 km pour 30 habitants = 333 km pour 10 000 habitants).
+# habitants (même seuil que les classements et corrélations du site) : sinon un hameau traversé par
+# une voie verte, ou doté d'une seule station, passerait devant les grandes villes cyclables
+# (1 km pour 30 habitants = 333 km pour 10 000 habitants). Mesuré sur les vraies données : avec un
+# plancher de 2 000 habitants, le haut du classement restait occupé par des villages dotés d'une
+# seule station (95 % des communes n'en ont aucune) ; avec 10 000, ce sont des villes et des bourgs
+# bien équipés, et les grandes villes cyclables remontent.
 
 SCORE_SIMPLE_INDICATEURS = ["km_10k_hab", "vls_stations_100k"]
-PLANCHER_POPULATION = 2_000
+PLANCHER_POPULATION = 10_000
 
 
 def rangs_rapides(valeurs: dict[str, float | None]) -> dict[str, tuple[int, int] | None]:

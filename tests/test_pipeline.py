@@ -214,7 +214,7 @@ def test_score_simple(monde):
 
 def test_rangs_rapides_et_plancher():
     assert indicateurs.rangs_rapides({"a": 3, "b": 5, "c": 3, "d": None}) == {"a": (2, 2), "b": (1, 1), "c": (2, 2), "d": None}
-    # Hameau de 30 habitants avec 1 km : ramené à 2 000 habitants, il ne dépasse pas une ville bien équipée
+    # Hameau de 30 habitants avec 1 km : ramené à 10 000 habitants, il ne dépasse pas une ville bien équipée
     r = indicateurs.score_simple_communes({
         "hameau": {"p": 30, "km": {"t": 1}, "vls": {"st": 0}},
         "ville": {"p": 100_000, "km": {"t": 300}, "vls": {"st": 50}},
