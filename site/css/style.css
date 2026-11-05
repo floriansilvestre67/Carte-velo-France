@@ -212,6 +212,8 @@ input[type="search"] {
 
 .leaflet-container { font-family: var(--police); }
 .fond-gris { filter: grayscale(1) contrast(0.85) brightness(1.08); }
+/* Pistes CyclOSM : traits élargis (filtre SVG ajouté par commun.js) et couleurs un peu plus franches */
+.leaflet-pane.pistes-epaissies { filter: url(#epaissir-pistes) saturate(1.35) contrast(1.1); }
 .leaflet-tooltip.info-dep { font-size: 0.9rem; padding: 6px 10px; border-radius: 4px; }
 .leaflet-tooltip.info-dep strong { display: block; }
 .leaflet-popup-content { font-size: 0.9rem; line-height: 1.4; }
