@@ -2,12 +2,12 @@
 
 Carte interactive de la France métropolitaine montrant où le vélo est le mieux servi : aménagements cyclables, vélos en libre-service (VLS), stationnement vélo, lieux à visiter, accidents de vélo et un « score vélo » sur 20 (aménagements, vélos en libre-service et stationnement pour 10 000 habitants). On peut descendre au niveau de chaque ville. Toutes les données sont ouvertes et recalculées chaque jour.
 
-- **Accueil** : le slogan « Où fait-il bon pédaler ? Le baromètre des territoires cyclables. » et l'accès à la carte.
+- **Accueil** : le slogan « Où fait-il bon pédaler ? Le baromètre des territoires cyclables. », le choix d'une ville ou d'un département et des éléments à afficher (vélos en libre-service, pistes, stationnement, lieux à visiter), puis « Voir la carte ».
 - **Carte** : départements colorés selon le score vélo sur 20, recherche d'une ville ou d'un département, fiche courte (score, rang, trois critères) avec un bouton « Plus de détails » qui déplie tous les chiffres (indicateurs et rangs du département ; population, aménagements, stationnement, vélos en libre-service, accidents et lieux de la ville), et quatre calques à activer.
 - **Statistiques** : accidents de vélo par zone (France, région, département, ville) et par période, avec graphiques, ratios et corrélations.
 - **Sources et méthode** : origine de chaque donnée, définitions, limites et état du dernier calcul.
 
-Une ville se partage par son code INSEE dans l'adresse (`carte.html?ville=63113`), un département par son numéro (`carte.html?dep=63`). Les anciens liens restent valables : ceux de l'ancienne carte détaillée (`carte-detaillee.html`, `#dep=…`) ouvrent la carte sur la même ville ou le même département.
+Une ville se partage par son code INSEE dans l'adresse (`carte.html?ville=63113`), un département par son numéro (`carte.html?dep=63`) ; les éléments affichés s'ajoutent avec `calques=` (par ex. `carte.html?ville=63113&calques=vls,poi`). Les anciens liens restent valables : ceux de l'ancienne carte détaillée (`carte-detaillee.html`, `#dep=…`) ouvrent la carte sur la même ville ou le même département.
 
 Site : https://floriansilvestre67.github.io/Carte-velo-France/
 
@@ -70,6 +70,7 @@ site/
   css/style.css, css/intro.css, css/accueil.css, css/statistiques.css
   js/commun.js            formats, fond de carte, calques et leurs bascules
   js/fiches.js            fiches détaillées (« Plus de détails ») d'un département ou d'une ville
+  js/intro.js             page d'accueil : choix de la ville et des éléments à afficher
   js/accueil.js           la carte : recherche, fiche courte, communes cliquables
   js/ville.js             recherche de ville (commune aux deux pages)
   js/statistiques.js      graphiques (Chart.js) et filtres

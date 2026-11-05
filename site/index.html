@@ -40,8 +40,25 @@
       <h1>Où fait-il bon pédaler&nbsp;?</h1>
       <p class="accroche">Le baromètre des territoires cyclables.</p>
       <p class="descriptif">Trouvez les meilleurs itinéraires et les services vélos près de chez vous et partout en France.</p>
-      <a class="bouton-principal" href="carte.html">Voir la carte
-        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h11M11 5l5 5-5 5"/></svg></a>
+      <!-- Choix avant d'ouvrir la carte : une ville ou un département, et ce qu'on veut y voir.
+           Sans JavaScript, le formulaire ouvre simplement la carte. -->
+      <form class="choix-carte" id="choix-carte" action="carte.html" method="get">
+        <div class="champ-ville">
+          <label class="titre-choix" for="recherche-ville">Ville ou département</label>
+          <input type="search" id="recherche-ville" placeholder="Ex. Strasbourg, 69003, Gironde, 63" spellcheck="false" autocomplete="off">
+          <ul id="suggestions-ville" class="suggestions" hidden></ul>
+          <p class="aide-choix" id="aide-choix" hidden></p>
+        </div>
+        <fieldset class="cases-calques">
+          <legend class="titre-choix">Afficher sur la carte</legend>
+          <label><input type="checkbox" name="calque" value="vls"> Vélos en libre-service</label>
+          <label><input type="checkbox" name="calque" value="cyclosm"> Pistes cyclables</label>
+          <label><input type="checkbox" name="calque" value="stationnement"> Stationnement vélo</label>
+          <label><input type="checkbox" name="calque" value="poi"> Lieux à visiter</label>
+        </fieldset>
+        <button type="submit" class="bouton-principal">Voir la carte
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h11M11 5l5 5-5 5"/></svg></button>
+      </form>
     </div>
 
     <!-- Illustration décorative : un itinéraire qui relie des étapes, aux couleurs de la carte -->
@@ -62,5 +79,7 @@
   <footer class="pied-intro">
     <p>made by IAE's students</p>
   </footer>
+  <script src="js/ville.js"></script>
+  <script src="js/intro.js"></script>
 </body>
 </html>
