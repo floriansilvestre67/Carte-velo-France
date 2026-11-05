@@ -53,6 +53,12 @@ jobs:
           FORCER_POI: ${{ inputs.forcer_poi && '1' || '' }}
         run: python scripts/construire_donnees.py --sortie site/data
 
+      # Numéro de version ajouté aux fichiers CSS et JS du site (css/style.css -> css/style.css?v=abc1234) :
+      # les navigateurs prennent la nouvelle version dès la mise en ligne, au lieu de garder l'ancienne
+      # jusqu'à 10 minutes en mémoire.
+      - name: Versionner les fichiers CSS et JS
+        run: sed -i -E 's#(href|src)="((css|js)/[^"?]+)"#\1="\2?v='"${GITHUB_SHA::7}"'"#g' site/*.html
+
       - name: Préparer GitHub Pages
         uses: actions/configure-pages@v5
 
