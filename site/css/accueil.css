@@ -83,3 +83,6 @@
 @media (max-width: 700px) {
   .fiche-courte.deplie { width: auto; max-height: 85%; }
 }
+
+/* Une pop-up ouverte (lieu, station…) n'est pas recouverte par les infobulles de survol */
+.popup-ouverte .leaflet-tooltip { display: none; }

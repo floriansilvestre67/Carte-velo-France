@@ -263,6 +263,30 @@
     });
   }
 
+  // ---------------------------------------------------------------- pop-ups des lieux et des stations
+
+  /* Une pop-up de la carte ne peut pas passer devant la fiche (elle est dessinée dans la carte) :
+     on déplace donc la carte pour qu'elle s'ouvre dans la partie visible, à côté de la fiche
+     (ordinateur) ou au-dessus d'elle (téléphone). Sur téléphone, « Plus de détails » se replie
+     d'abord pour libérer de la place. */
+  function placerPopupHorsFiche(e) {
+    var fiche = $("fiche-courte");
+    if (!fiche || fiche.hidden) return;
+    var bouton = $("bouton-details");
+    var telephone = window.matchMedia("(max-width: 700px)").matches;
+    if (telephone && bouton && bouton.getAttribute("aria-expanded") === "true") bouton.click();
+    var m = $("carte").getBoundingClientRect(), f = fiche.getBoundingClientRect();
+    var marge = 12, hautGauche = [marge, marge], basDroite = [marge, marge];
+    if (f.top - m.top > m.height * 0.35) {
+      basDroite[1] = Math.max(marge, m.bottom - f.top + marge);       // fiche en bas (téléphone)
+    } else {
+      hautGauche[0] = Math.max(marge, f.right - m.left + marge);      // fiche à gauche (ordinateur)
+    }
+    e.popup.options.autoPanPaddingTopLeft = L.point(hautGauche);
+    e.popup.options.autoPanPaddingBottomRight = L.point(basDroite);
+    e.popup.update();                                                 // recalcule la position avec ces marges
+  }
+
   // ---------------------------------------------------------------- démarrage
 
   Promise.all([
@@ -284,6 +308,10 @@
       else choisirVille(v.entiere || v.code);
     }, { departements: function () { return proprietes().map(function (p) { return { code: p.code, nom: p.nom }; }); } });
     carte.on("moveend", majCommunes);
+    carte.on("popupopen", placerPopupHorsFiche);
+    // Pendant qu'une pop-up est ouverte, les infobulles de survol (département, commune) sont masquées
+    carte.on("popupopen", function () { carte.getContainer().classList.add("popup-ouverte"); });
+    carte.on("popupclose", function () { carte.getContainer().classList.remove("popup-ouverte"); });
     // Adresse : ?ville=…, ?dep=… ; anciens liens de la carte détaillée : #dep=…
     var q = new URLSearchParams(location.search), h = new URLSearchParams(location.hash.slice(1));
     var ville = q.get("ville"), depDemande = q.get("dep") || h.get("dep");
