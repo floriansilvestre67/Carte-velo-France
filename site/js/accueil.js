@@ -173,10 +173,12 @@
 
   // ---------------------------------------------------------------- ville
 
-  /* Adresse partageable : ?ville=CODE_INSEE ou ?dep=CODE */
+  /* Adresse partageable : ?ville=CODE_INSEE ou ?dep=CODE, et &calques=vls,poi… (calques affichés) */
   function majAdresse() {
-    var q = etat.ville ? "?ville=" + etat.ville : etat.selection ? "?dep=" + etat.selection : "";
-    history.replaceState(null, "", location.pathname + q);
+    var q = etat.ville ? "ville=" + etat.ville : etat.selection ? "dep=" + etat.selection : "";
+    var actifs = calques ? calques.actifs() : [];
+    if (actifs.length) q += (q ? "&" : "") + "calques=" + actifs.join(",");
+    history.replaceState(null, "", location.pathname + (q ? "?" + q : ""));
   }
 
   function choisirVille(code, sansFermer) {
@@ -268,7 +270,8 @@
     dessinerDepartements();
     dessinerLegende();
     calques = CVF.creerCalques(carte, { departementsVisibles: departementsVisibles,
-                                        villeActive: function () { return !!etat.ville; } });
+                                        villeActive: function () { return !!etat.ville; },
+                                        surChangement: majAdresse });
     // Recherche : communes et départements (nom ou numéro)
     recherche = RechercheVille.attacher($("recherche-ville"), $("suggestions-ville"), function (v) {
       if (v.type === "departement") choisirDepartement(v.code, true);
@@ -278,6 +281,10 @@
     // Adresse : ?ville=…, ?dep=… ; anciens liens de la carte détaillée : #dep=…
     var q = new URLSearchParams(location.search), h = new URLSearchParams(location.hash.slice(1));
     var ville = q.get("ville"), depDemande = q.get("dep") || h.get("dep");
+    // Calques demandés (cases cochées sur la page d'accueil, ou adresse partagée)
+    (q.get("calques") || "").split(",").forEach(function (nom) {
+      if (calques.noms.indexOf(nom) >= 0) calques.basculer(nom, true);
+    });
     if (ville && /^[0-9AB]{5}$/i.test(ville)) choisirVille(ville.toUpperCase());
     else if (depDemande && dep(depDemande.toUpperCase())) choisirDepartement(depDemande.toUpperCase(), true);
   }).catch(function (e) {

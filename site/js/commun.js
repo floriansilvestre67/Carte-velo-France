@@ -116,7 +116,8 @@
   /* options :
        departementsVisibles() -> codes des départements à charger (stationnement, lieux)
        villeActive()          -> vrai si une ville est choisie (les lieux se chargent alors sans zoomer)
-       legendes               -> élément où afficher la légende des calques actifs (facultatif) */
+       legendes               -> élément où afficher la légende des calques actifs (facultatif)
+       surChangement()        -> appelé quand un calque est activé ou désactivé (facultatif) */
   function creerCalques(carte, options) {
     options = options || {};
     var actifs = {}, boutons = {}, couches = {}, statCharges = {}, poiCharges = {};
@@ -323,6 +324,7 @@
       }
       if (!actif) indiquer(nom, "");
       majLegendes();
+      if (options.surChangement) options.surChangement();
     }
 
     var Controle = L.Control.extend({
@@ -354,6 +356,8 @@
     return {
       basculer: basculer,
       estActif: function (nom) { return !!actifs[nom]; },
+      actifs: function () { return BASCULES.map(function (b) { return b.nom; }).filter(function (n) { return actifs[n]; }); },
+      noms: BASCULES.map(function (b) { return b.nom; }),
       actualiser: function () { majStationnement(); majPoi(); },
       chargerPoi: chargerPoi,
       montrerLieu: montrerLieu,

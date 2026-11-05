@@ -28,6 +28,28 @@
 .bouton-principal:focus-visible { outline: 3px solid #f2a900; outline-offset: 3px; }
 .bouton-principal svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 
+/* Choix de la ville et des calques, avant d'ouvrir la carte */
+.choix-carte {
+  margin-top: 28px; padding: 18px 20px 20px; max-width: 470px; background: #ffffff;
+  border: 1px solid var(--trait); border-radius: 16px; box-shadow: 0 2px 10px rgba(31, 42, 46, 0.06);
+}
+.titre-choix { display: block; font-weight: 700; font-size: 0.95rem; margin: 0 0 6px; padding: 0; color: var(--encre); }
+.choix-carte input[type="search"] {
+  width: 100%; font: inherit; color: var(--encre); padding: 11px 14px; min-height: 46px;
+  border: 1px solid #b9c6c2; border-radius: 10px; background: #ffffff;
+}
+.choix-carte input[type="search"]:focus-visible { outline: 3px solid #f2a900; outline-offset: 1px; }
+.aide-choix { margin: 6px 0 0; font-size: 0.88rem; color: #a3341f; }
+.cases-calques { border: 0; margin: 16px 0 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; }
+.cases-calques legend { grid-column: 1 / -1; }
+.cases-calques label {
+  display: flex; align-items: center; gap: 9px; min-height: 40px; padding: 4px 6px; border-radius: 8px;
+  cursor: pointer; font-size: 0.95rem;
+}
+.cases-calques label:hover { background: var(--fond); }
+.cases-calques input { width: 20px; height: 20px; margin: 0; accent-color: var(--vert-fonce); flex: none; }
+.choix-carte .bouton-principal { margin-top: 18px; border: 0; font: inherit; font-size: 1.1rem; font-weight: 700; cursor: pointer; }
+
 /* Illustration : itinéraire et étapes, dans la palette verte de la carte */
 .intro-illustration { width: 100%; max-width: 440px; justify-self: center; overflow: visible; }
 .intro-illustration .trace-fond { fill: none; stroke: #e3f2ea; stroke-width: 26; stroke-linecap: round; }
@@ -45,6 +67,8 @@
   .intro { grid-template-columns: 1fr; gap: 12px; padding: 32px 20px 40px; text-align: left; }
   .intro-illustration { max-width: 240px; justify-self: center; margin-top: 16px; }
   .bouton-principal { width: 100%; justify-content: center; }
+  .choix-carte { max-width: none; padding: 16px; }
+  .cases-calques { grid-template-columns: 1fr; }
 }
 @media (max-width: 640px) {
   .page-intro .bandeau { padding-left: 16px; padding-right: 16px; }
