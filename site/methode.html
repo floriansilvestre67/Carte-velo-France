@@ -99,21 +99,19 @@
     <p>Certains services en free-floating (Dott, Lime, Voi…) publient leurs zones de stationnement comme des stations. Dans la fiche d'une ville, elles sont comptées à part (« zones de stationnement en free-floating »), grâce à l'indication « station virtuelle » des flux. Les chiffres par département et le score vélo les comptent encore comme des stations.</p>
 
     <h2 id="score">Le score vélo</h2>
-    <p>Le score vélo, sur 100, résume six indicateurs :</p>
+    <p>Le score vélo est une <strong>note sur 20</strong>. Il repose sur trois critères, tous rapportés à 10 000 habitants pour comparer équitablement des territoires de tailles différentes :</p>
     <ul>
-      <li>km d'aménagements cyclables ;</li>
-      <li>km d'aménagements pour 10 000 habitants ;</li>
-      <li>densité d'aménagements (km par km²) ;</li>
-      <li>nombre de stations de vélos en libre-service ;</li>
-      <li>nombre de vélos en libre-service disponibles ;</li>
-      <li>stations pour 100 000 habitants.</li>
+      <li>km d'aménagements cyclables pour 10 000 habitants ;</li>
+      <li>stations de vélos en libre-service pour 10 000 habitants (les vraies stations : les zones virtuelles des services sans station ne comptent pas) ;</li>
+      <li>places de stationnement vélo pour 10 000 habitants (indicateur officiel, toutes places confondues).</li>
     </ul>
-    <p>Pour chaque indicateur, les départements sont classés et reçoivent un rang centile : 100 pour le premier, 0 pour le dernier, les autres régulièrement entre les deux. Les ex æquo reçoivent la moyenne de leurs rangs. Le score est la moyenne de ces six rangs centiles.</p>
-    <p>Exemple : un département premier sur trois indicateurs (100), et au milieu du classement sur les trois autres (50), obtient (3 × 100 + 3 × 50) ÷ 6 = 75.</p>
-    <p>Le score mesure une position relative entre départements, pas une qualité absolue. Il mélange volontairement des totaux, qui favorisent les grands départements, et des chiffres rapportés à la population ou à la surface, qui favorisent les départements urbains. Si une source est indisponible, le score est calculé sur les indicateurs restants et la fiche du département le signale.</p>
+    <p><strong>Une note sur 20 par critère.</strong> Les territoires sont classés sur chaque critère : le meilleur de France obtient 20/20, le dernier 0/20, et les autres sont répartis entre les deux selon leur rang. Les ex æquo reçoivent la moyenne de leurs rangs. Un territoire qui n'a rien sur un critère (aucune station, aucune place) obtient 0/20 sur ce critère : sans cette règle, les très nombreuses communes sans vélo en libre-service recevraient une note moyenne pour rien.</p>
+    <p><strong>La note finale</strong> est la moyenne des trois notes, arrondie au dixième ; les trois critères comptent autant.</p>
+    <p>Exemple : une ville à 16/20 en aménagements, 18/20 en vélos en libre-service et 9/20 en stationnement obtient (16 + 18 + 9) ÷ 3 = 14,3/20.</p>
+    <p>La note est relative : 20/20 veut dire « parmi les meilleurs de France », pas « parfait ». Si une source est indisponible pour un département, la note est calculée sur les critères restants et la fiche le signale. Les autres indicateurs de la carte détaillée (km au total, densité, vélos disponibles…) restent consultables mais n'entrent pas dans le score.</p>
     <h3 id="score-carte-accueil">Le même score sur les deux cartes</h3>
     <p>La carte d'accueil et la carte détaillée affichent le même score vélo, calculé comme ci-dessus. Pour les départements, ce sont les 96 départements de métropole qui sont comparés.</p>
-    <p id="score-communes"><strong>Score des communes.</strong> La même méthode est appliquée à toutes les communes de métropole : les six indicateurs sont calculés pour chaque commune (les zones virtuelles des vélos en libre-service sans station ne comptent pas comme des stations), puis les rangs centiles sont établis entre toutes les communes. Pour les deux indicateurs rapportés à la population, la population prise en compte est d'au moins 10 000 habitants, le seuil déjà utilisé par les classements du site : sans ce plancher, un hameau traversé par une voie verte ou doté d'une seule station passerait devant les grandes villes cyclables (1 km pour 30 habitants ferait 333 km pour 10 000 habitants). Une commune dont il manque une donnée n'est pas classée ; des communes au même score sont classées ex æquo. Le rang d'une ville sur la carte d'accueil est son rang parmi toutes les communes classées ; l'onglet « 10 premières communes » de la carte détaillée montre ce même score pour les communes de plus de 10 000 habitants.</p>
+    <p id="score-communes"><strong>Score des communes.</strong> La même note sur 20 est calculée pour toutes les communes de métropole, en les comparant entre elles. La population prise en compte est d'au moins 10 000 habitants, le seuil déjà utilisé par les classements du site : sans ce plancher, un hameau de 30 habitants avec un arceau de 10 places aurait 3 333 places pour 10 000 habitants et passerait premier. Une commune dont il manque un critère n'est pas classée ; des communes à la même note sont classées ex æquo. Le rang d'une ville sur la carte est son rang parmi toutes les communes classées ; l'onglet « 10 premières communes » de la carte détaillée montre la même note pour les communes de plus de 10 000 habitants.</p>
 
     <h2 id="ville">Fiche Ville</h2>
     <p>Une ville est une commune, repérée par son code INSEE. Paris, Lyon et Marseille sont traités comme une seule commune ; leurs arrondissements restent consultables dans la recherche et sur la page Statistiques.</p>
