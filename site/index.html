@@ -6,15 +6,14 @@
   <title>Carte Vélo France – Le baromètre des territoires cyclables</title>
   <meta name="description" content="Où fait-il bon pédaler ? Le baromètre des territoires cyclables : trouvez les meilleurs itinéraires et les services vélos près de chez vous et partout en France.">
   <script>
-    /* Anciens liens partagés (quand la carte était la page d'accueil) :
-       réglages de la carte détaillée -> carte détaillée ; ville seule -> carte. */
+    /* Anciens liens partagés (quand la carte était la page d'accueil, ou la carte détaillée) :
+       une ville ou un département ouvre la carte sur cette ville ou ce département. */
     (function () {
       var h = new URLSearchParams(location.hash.slice(1)), q = new URLSearchParams(location.search);
-      if (h.has("ind") || h.has("reg") || h.has("dep") || q.has("arr")) {
-        location.replace("carte-detaillee.html" + location.search + location.hash);
-      } else if (q.has("ville")) {
-        location.replace("carte.html" + location.search);
-      }
+      var ville = q.get("ville"), dep = q.get("dep") || h.get("dep");
+      if (ville) location.replace("carte.html?ville=" + encodeURIComponent(ville));
+      else if (dep) location.replace("carte.html?dep=" + encodeURIComponent(dep));
+      else if (h.has("ind") || h.has("reg")) location.replace("carte.html");
     })();
   </script>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='7' fill='%230e7c5a'/%3E%3C/svg%3E">
@@ -31,7 +30,6 @@
     <a class="marque" href="./" aria-current="page"><span class="pastille" aria-hidden="true"></span>Carte Vélo France</a>
     <nav aria-label="Navigation principale">
       <a href="carte.html">Carte</a>
-      <a href="carte-detaillee.html">Carte détaillée</a>
       <a href="statistiques.html">Statistiques</a>
       <a href="methode.html">Sources et méthode</a>
     </nav>
