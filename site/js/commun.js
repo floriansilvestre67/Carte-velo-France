@@ -113,6 +113,20 @@
       picto: '<path d="M10 18s-5.5-5.2-5.5-9A5.5 5.5 0 0 1 15.5 9c0 3.8-5.5 9-5.5 9z"/><circle cx="10" cy="9" r="2"/>' }
   ];
 
+  /* Filtre SVG qui élargit les traits d'une image sans changer leurs couleurs (dilatation),
+     utilisé par la classe CSS « pistes-epaissies ». Ajouté une seule fois à la page. */
+  function ajouterFiltreEpaississement() {
+    if (document.getElementById("epaissir-pistes")) return;
+    var ns = "http://www.w3.org/2000/svg";
+    var svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("aria-hidden", "true");
+    svg.setAttribute("width", "0"); svg.setAttribute("height", "0");
+    svg.style.position = "absolute";
+    svg.innerHTML = '<filter id="epaissir-pistes" x="-2%" y="-2%" width="104%" height="104%" color-interpolation-filters="sRGB">' +
+      '<feMorphology operator="dilate" radius="1"/></filter>';
+    document.body.appendChild(svg);
+  }
+
   /* options :
        departementsVisibles() -> codes des départements à charger (stationnement, lieux)
        villeActive()          -> vrai si une ville est choisie (les lieux se chargent alors sans zoomer)
@@ -123,12 +137,25 @@
     var actifs = {}, boutons = {}, couches = {}, statCharges = {}, poiCharges = {};
     var statut = null;
 
+    // Pistes CyclOSM, rendues plus visibles :
+    //  - traits épaissis d'environ 2 pixels, couleurs inchangées (filtre « epaissir-pistes », voir style.css) ;
+    //  - de 9 à 13 de zoom (une ville vue de loin), on affiche les images du niveau de zoom suivant en
+    //    taille réduite : CyclOSM ne dessine les bandes cyclables et double-sens (pointillés) qu'à partir
+    //    d'un certain zoom ; ainsi elles apparaissent plus tôt. Cela demande 4 fois plus d'images à ces niveaux.
     carte.createPane("calqueCyclOSM");
-    carte.getPane("calqueCyclOSM").style.zIndex = 450;
-    couches.cyclosm = L.tileLayer("https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm-lite/{z}/{x}/{y}.png", {
-      subdomains: "abc", maxZoom: 18, pane: "calqueCyclOSM",
-      attribution: 'Pistes : <a href="https://www.cyclosm.org">CyclOSM</a>'
-    });
+    var panneauPistes = carte.getPane("calqueCyclOSM");
+    panneauPistes.style.zIndex = 450;
+    panneauPistes.classList.add("pistes-epaissies");
+    ajouterFiltreEpaississement();
+    var URL_CYCLOSM = "https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm-lite/{z}/{x}/{y}.png";
+    // Images chargées seulement quand la carte s'arrête (pas pendant les zooms animés) : moins de requêtes
+    var optionsPistes = { subdomains: "abc", pane: "calqueCyclOSM", updateWhenZooming: false, updateWhenIdle: true,
+                          attribution: 'Pistes : <a href="https://www.cyclosm.org">CyclOSM</a>' };
+    couches.cyclosm = L.layerGroup([
+      L.tileLayer(URL_CYCLOSM, L.extend({ minZoom: 4, maxZoom: 8 }, optionsPistes)),                        // de loin
+      L.tileLayer(URL_CYCLOSM, L.extend({ minZoom: 9, maxZoom: 13, tileSize: 128, zoomOffset: 1 }, optionsPistes)), // ville
+      L.tileLayer(URL_CYCLOSM, L.extend({ minZoom: 14, maxZoom: 18 }, optionsPistes))                       // rue
+    ]);
 
     function groupe(classeCss, rayon, sansRegroupementA, attribution) {
       return L.markerClusterGroup({

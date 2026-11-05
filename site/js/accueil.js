@@ -26,7 +26,9 @@
 
   function opacite() {
     var z = carte.getZoom();
-    return z <= 7 ? 0.82 : z <= 8 ? 0.6 : z <= 10 ? 0.35 : 0.15;
+    var o = z <= 7 ? 0.82 : z <= 8 ? 0.6 : z <= 10 ? 0.35 : 0.15;
+    // Pistes affichées : l'aplat du score s'efface davantage pour ne pas les noyer
+    return calques && calques.estActif("cyclosm") ? o * 0.45 : o;
   }
 
   function style(feature) {
@@ -40,7 +42,11 @@
   function recolorer() {
     etat.calqueDeps.setStyle(style);
     if (etat.selection && etat.couches[etat.selection]) etat.couches[etat.selection].bringToFront();
+    if (etat.calqueVille) etat.calqueVille.setStyle({ fillOpacity: opaciteVille() });
   }
+
+  // Intérieur de la ville choisie : plus léger quand les pistes sont affichées
+  function opaciteVille() { return calques && calques.estActif("cyclosm") ? 0.12 : 0.35; }
 
   function dessinerDepartements() {
     etat.calqueDeps = L.geoJSON(etat.geo, {
@@ -204,7 +210,7 @@
       if (forme) {
         // Seule la ville est colorée (selon son score), détourée en trait gras
         etat.calqueVille = L.geoJSON(forme, { interactive: false,
-          style: { color: "#1f2a2e", weight: 4, fill: true, fillColor: couleur(c.sc), fillOpacity: 0.35 } }).addTo(carte);
+          style: { color: "#1f2a2e", weight: 4, fill: true, fillColor: couleur(c.sc), fillOpacity: opaciteVille() } }).addTo(carte);
         centrerSur(etat.calqueVille.getBounds(), 13);
       }
       var sur = (f.score_communes || {}).sur;
@@ -271,7 +277,7 @@
     dessinerLegende();
     calques = CVF.creerCalques(carte, { departementsVisibles: departementsVisibles,
                                         villeActive: function () { return !!etat.ville; },
-                                        surChangement: majAdresse });
+                                        surChangement: function () { majAdresse(); recolorer(); } });
     // Recherche : communes et départements (nom ou numéro)
     recherche = RechercheVille.attacher($("recherche-ville"), $("suggestions-ville"), function (v) {
       if (v.type === "departement") choisirDepartement(v.code, true);
