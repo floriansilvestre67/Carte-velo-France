@@ -42,19 +42,20 @@
       <p class="descriptif">Trouvez les meilleurs itinéraires et les services vélos près de chez vous et partout en France.</p>
       <!-- Choix avant d'ouvrir la carte : une ville ou un département, et ce qu'on veut y voir.
            Sans JavaScript, le formulaire ouvre simplement la carte. -->
-      <form class="choix-carte" id="choix-carte" action="carte.html" method="get">
+      <form class="choix-carte" id="choix-carte" action="carte.html" method="get" aria-labelledby="guide-choix">
+        <p class="guide-choix" id="guide-choix">Choisissez votre ville et sélectionnez les paramètres qui vous intéressent</p>
         <div class="champ-ville">
-          <label class="titre-choix" for="recherche-ville">Ville ou département</label>
-          <input type="search" id="recherche-ville" placeholder="Ex. Strasbourg, 69003, Gironde, 63" spellcheck="false" autocomplete="off">
+          <label class="visuellement-cache" for="recherche-ville">Ville ou département</label>
+          <input type="search" id="recherche-ville" placeholder="Ville ou département" spellcheck="false" autocomplete="off">
           <ul id="suggestions-ville" class="suggestions" hidden></ul>
           <p class="aide-choix" id="aide-choix" hidden></p>
         </div>
         <fieldset class="cases-calques">
-          <legend class="titre-choix">Afficher sur la carte</legend>
-          <label><input type="checkbox" name="calque" value="vls"> Vélos en libre-service</label>
-          <label><input type="checkbox" name="calque" value="cyclosm"> Pistes cyclables</label>
-          <label><input type="checkbox" name="calque" value="stationnement"> Stationnement vélo</label>
-          <label><input type="checkbox" name="calque" value="poi"> Lieux à visiter</label>
+          <legend class="visuellement-cache">Paramètres à afficher sur la carte</legend>
+          <label><input type="checkbox" name="calque" value="vls"><span>Vélos en libre-service</span></label>
+          <label><input type="checkbox" name="calque" value="cyclosm"><span>Pistes cyclables</span></label>
+          <label><input type="checkbox" name="calque" value="stationnement"><span>Stationnement</span></label>
+          <label><input type="checkbox" name="calque" value="poi"><span>Lieux à visiter</span></label>
         </fieldset>
         <button type="submit" class="bouton-principal">Voir la carte
           <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h11M11 5l5 5-5 5"/></svg></button>
