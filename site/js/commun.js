@@ -1,4 +1,4 @@
-/* Carte Vélo France — code commun aux deux cartes (carte d'accueil et carte détaillée).
+/* Carte Vélo France — code commun de la carte (carte.html) : formats, fond de carte, calques.
    Expose window.CVF :
      - formats (echapper, ordinal, dateFr, nombre) et palette de couleurs ;
      - fichier(chemin) : lecture des fichiers de données, mise en cache ;
@@ -290,7 +290,7 @@
       });
     }
 
-    // --- légendes (carte détaillée seulement)
+    // --- légendes (si un conteneur est fourni)
     function majLegendes() {
       var el = options.legendes;
       if (!el) return;

@@ -17,7 +17,6 @@
     <a class="marque" href="./"><span class="pastille" aria-hidden="true"></span>Carte Vélo France</a>
     <nav aria-label="Navigation principale">
       <a href="carte.html">Carte</a>
-      <a href="carte-detaillee.html">Carte détaillée</a>
       <a href="statistiques.html">Statistiques</a>
       <a href="methode.html" aria-current="page">Sources et méthode</a>
     </nav>
@@ -108,13 +107,13 @@
     <p><strong>Une note sur 20 par critère.</strong> Les territoires sont classés sur chaque critère : le meilleur de France obtient 20/20, le dernier 0/20, et les autres sont répartis entre les deux selon leur rang. Les ex æquo reçoivent la moyenne de leurs rangs. Un territoire qui n'a rien sur un critère (aucune station, aucune place) obtient 0/20 sur ce critère : sans cette règle, les très nombreuses communes sans vélo en libre-service recevraient une note moyenne pour rien.</p>
     <p><strong>La note finale</strong> est la moyenne des trois notes, arrondie au dixième ; les trois critères comptent autant.</p>
     <p>Exemple : une ville à 16/20 en aménagements, 18/20 en vélos en libre-service et 9/20 en stationnement obtient (16 + 18 + 9) ÷ 3 = 14,3/20.</p>
-    <p>La note est relative : 20/20 veut dire « parmi les meilleurs de France », pas « parfait ». Si une source est indisponible pour un département, la note est calculée sur les critères restants et la fiche le signale. Les autres indicateurs de la carte détaillée (km au total, densité, vélos disponibles…) restent consultables mais n'entrent pas dans le score.</p>
-    <h3 id="score-carte-accueil">Le même score sur les deux cartes</h3>
-    <p>La carte d'accueil et la carte détaillée affichent le même score vélo, calculé comme ci-dessus. Pour les départements, ce sont les 96 départements de métropole qui sont comparés.</p>
-    <p id="score-communes"><strong>Score des communes.</strong> La même note sur 20 est calculée pour toutes les communes de métropole, en les comparant entre elles. La population prise en compte est d'au moins 10 000 habitants, le seuil déjà utilisé par les classements du site : sans ce plancher, un hameau de 30 habitants avec un arceau de 10 places aurait 3 333 places pour 10 000 habitants et passerait premier. Une commune dont il manque un critère n'est pas classée ; des communes à la même note sont classées ex æquo. Le rang d'une ville sur la carte est son rang parmi toutes les communes classées ; l'onglet « 10 premières communes » de la carte détaillée montre la même note pour les communes de plus de 10 000 habitants.</p>
+    <p>La note est relative : 20/20 veut dire « parmi les meilleurs de France », pas « parfait ». Si une source est indisponible pour un département, la note est calculée sur les critères restants et la fiche le signale. Les autres indicateurs (km au total, densité, vélos disponibles…) restent consultables avec « Plus de détails » sur la carte, mais n'entrent pas dans le score.</p>
+    <h3 id="score-carte-accueil">Départements</h3>
+    <p>Pour les départements, ce sont les 96 départements de métropole qui sont comparés.</p>
+    <p id="score-communes"><strong>Score des communes.</strong> La même note sur 20 est calculée pour toutes les communes de métropole, en les comparant entre elles. La population prise en compte est d'au moins 10 000 habitants, le seuil déjà utilisé par les classements du site : sans ce plancher, un hameau de 30 habitants avec un arceau de 10 places aurait 3 333 places pour 10 000 habitants et passerait premier. Une commune dont il manque un critère n'est pas classée ; des communes à la même note sont classées ex æquo. Le rang d'une ville sur la carte est son rang parmi toutes les communes classées.</p>
 
     <h2 id="ville">Fiche Ville</h2>
-    <p>Une ville est une commune, repérée par son code INSEE. Paris, Lyon et Marseille sont traités comme une seule commune ; leurs arrondissements restent consultables dans la recherche et sur la page Statistiques.</p>
+    <p>Sur la carte, la recherche trouve une ville (nom ou code postal) ou un département (nom ou numéro). Un clic ouvre une fiche courte (score vélo, rang et les trois critères) ; le bouton « Plus de détails » déplie dessous tous les chiffres : pour un département, chaque indicateur avec son rang national et régional ; pour une ville, ceux qui suivent. Une ville est une commune, repérée par son code INSEE. Paris, Lyon et Marseille sont traités comme une seule commune ; leurs arrondissements restent consultables dans la recherche et sur la page Statistiques.</p>
     <ul>
       <li><strong>Kilomètres d'aménagements</strong> : chaque côté aménagé d'un tronçon est attribué à la commune indiquée pour ce côté dans la base nationale (une ancienne commune fusionnée est rattachée à sa commune actuelle). Les rares côtés sans code commune ne comptent qu'au niveau du département.</li>
       <li><strong>Vélos en libre-service, stationnement et lieux</strong> : rattachés à la commune qui contient leur position.</li>

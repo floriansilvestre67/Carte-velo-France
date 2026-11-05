@@ -182,11 +182,9 @@
     // Lien vers la carte en gardant la zone
     var h = new URLSearchParams();
     if (etat.ville) h.set("ville", etat.ville);
-    var hash = etat.dep ? "#dep=" + etat.dep : etat.region ? "#reg=" + etat.region : "";
-    // Carte d'accueil : seulement la ville ; carte détaillée : la ville, ou le département, ou la région
+    // Carte : la ville, sinon le département
+    if (!etat.ville && etat.dep) h.set("dep", etat.dep);
     $("lien-carte").href = "carte.html" + (h.toString() ? "?" + h.toString() : "");
-    if (etat.arr) h.set("arr", etat.arr);
-    $("lien-carte-detaillee").href = "carte-detaillee.html" + (h.toString() ? "?" + h.toString() : "") + hash;
   }
 
   function synchroniserControles() {

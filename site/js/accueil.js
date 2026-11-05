@@ -1,7 +1,8 @@
-/* Carte Vélo France — carte simplifiée (carte.html).
-   Départements colorés selon le score vélo sur 20 (le même que sur la carte détaillée, trois critères ;
+/* Carte Vélo France — la carte (carte.html).
+   Départements colorés selon le score vélo sur 20 (trois critères ;
    pour les communes, calculé par le pipeline entre toutes les communes de métropole), recherche
-   de ville, fiche courte au clic, et les quatre calques. Le code commun avec la carte détaillée est dans js/commun.js. */
+   de ville ou de département, fiche courte au clic avec « Plus de détails » (js/fiches.js), et les
+   quatre calques (js/commun.js). */
 (function () {
   "use strict";
 
@@ -108,8 +109,9 @@
     return ordinal(rang) + (exAequo ? " ex æquo" : "") + " sur " + nombre(sur);
   }
 
-  // Les trois critères du score vélo : aménagements, stations de vélos en libre-service, stationnement
-  function fiche(titre, sousTitre, score, rang, km, stations, places, lienDetail) {
+  // Les trois critères du score vélo : aménagements, stations de vélos en libre-service, stationnement.
+  // detail(cible) : dessine la fiche complète sous le bouton « Plus de détails » (au premier dépliage).
+  function fiche(titre, sousTitre, score, rang, km, stations, places, detail) {
     var el = $("fiche-courte");
     var indispo = '<span class="indispo">indisponible</span>';
     el.innerHTML =
@@ -124,38 +126,57 @@
       "<div><dt>Stations de vélos en libre-service</dt><dd>" + (stations != null ? nombre(stations) : indispo) + "</dd></div>" +
       "<div><dt>Places de stationnement vélo</dt><dd>" + (places != null ? nombre(places) : indispo) + "</dd></div>" +
       "</dl>" +
-      '<a class="lien-detail" href="' + lienDetail + '">Voir le détail</a>';
+      '<button type="button" class="bouton-details" id="bouton-details" aria-expanded="false" aria-controls="detail-fiche">' +
+      '<span>Plus de détails</span><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 8l5 5 5-5"/></svg></button>' +
+      '<div class="fiche detail-fiche" id="detail-fiche" hidden></div>';
     el.hidden = false;
     $("fermer-fiche-courte").addEventListener("click", fermer);
+    var bouton = $("bouton-details"), cible = $("detail-fiche"), dessine = false;
+    var deplier = function (ouvert) {
+      etat.detailOuvert = ouvert;                     // gardé d'une fiche à l'autre
+      bouton.setAttribute("aria-expanded", ouvert ? "true" : "false");
+      bouton.querySelector("span").textContent = ouvert ? "Moins de détails" : "Plus de détails";
+      el.classList.toggle("deplie", ouvert);
+      cible.hidden = !ouvert;
+      if (ouvert && !dessine) { dessine = true; detail(cible); }
+    };
+    bouton.addEventListener("click", function () { deplier(!etat.detailOuvert); });
+    if (etat.detailOuvert) deplier(true);
   }
 
   function fermer() {
     $("fiche-courte").hidden = true;
     if (etat.ville) choisirVille(null);
     etat.selection = null;
+    if (recherche) recherche.afficher("");
+    majAdresse();
     recolorer();
   }
 
-  function choisirDepartement(code) {
+  function choisirDepartement(code, recentrer) {
     if (etat.ville) choisirVille(null, true);
     var p = dep(code);
     if (!p) return;
     etat.selection = code;
+    majAdresse();
     recolorer();
+    if (recherche) recherche.afficher(p.nom);
+    if (recentrer && etat.couches[code]) centrerSur(etat.couches[code].getBounds(), 9);
     // Rang parmi les départements qui ont un score ; ex æquo si un autre a exactement le même score
     var classes = proprietes().filter(function (q) { return q.score != null; });
     var egaux = classes.filter(function (q) { return q.score === p.score; }).length;
     fiche(p.nom, "(" + p.code + ")", p.score,
           p.score != null && p.rangs && p.rangs.score ? texteRang(p.rangs.score, egaux > 1, classes.length) + " départements" : null,
-          p.km_total, p.vls_stations, p.stat_places, "carte-detaillee.html#dep=" + encodeURIComponent(code));
-    $("lien-detail-nav").href = "carte-detaillee.html#dep=" + encodeURIComponent(code);
+          p.km_total, p.vls_stations, p.stat_places,
+          function (cible) { cible.innerHTML = CVF.detailDepartement(p, etat.meta, proprietes); });
   }
 
   // ---------------------------------------------------------------- ville
 
+  /* Adresse partageable : ?ville=CODE_INSEE ou ?dep=CODE */
   function majAdresse() {
-    history.replaceState(null, "", location.pathname + (etat.ville ? "?ville=" + etat.ville : ""));
-    $("lien-detail-nav").href = "carte-detaillee.html" + (etat.ville ? "?ville=" + etat.ville : "");
+    var q = etat.ville ? "?ville=" + etat.ville : etat.selection ? "?dep=" + etat.selection : "";
+    history.replaceState(null, "", location.pathname + q);
   }
 
   function choisirVille(code, sansFermer) {
@@ -188,7 +209,10 @@
       fiche(c.n || code, (dep(d) || {}).nom || "", c.sc,
             c.rg && sur ? texteRang(c.rg, c.eq > 1, sur) + " communes" : null,
             c.km ? c.km.t : null, c.vls ? c.vls.st : null, c.stat ? c.stat.p : null,
-            "carte-detaillee.html?ville=" + encodeURIComponent(code));
+            function (cible) {
+              CVF.detailVille(cible, f, code, { meta: etat.meta, depProps: dep(d), calques: calques,
+                                                estToujoursAffiche: function () { return etat.ville === code; } });
+            });
       if (window.matchMedia("(max-width: 700px)").matches) $("fiche-courte").focus({ preventScroll: true });
     }).catch(function () {
       var el = $("fiche-courte");
@@ -233,22 +257,29 @@
 
   // ---------------------------------------------------------------- démarrage
 
-  fetch("data/departements.geojson").then(function (r) {
-    if (!r.ok) throw new Error("geo");
-    return r.json();
-  }).then(function (geo) {
+  Promise.all([
+    fetch("data/departements.geojson").then(function (r) { if (!r.ok) throw new Error("geo"); return r.json(); }),
+    fetch("data/meta.json").then(function (r) { if (!r.ok) throw new Error("meta"); return r.json(); })
+  ]).then(function (res) {
+    var geo = res[0];
+    etat.meta = res[1];
     etat.geo = geo;
     etat.seuils = CVF.seuilsQuantiles(proprietes().map(function (p) { return p.score; }));
     dessinerDepartements();
     dessinerLegende();
     calques = CVF.creerCalques(carte, { departementsVisibles: departementsVisibles,
                                         villeActive: function () { return !!etat.ville; } });
+    // Recherche : communes et départements (nom ou numéro)
     recherche = RechercheVille.attacher($("recherche-ville"), $("suggestions-ville"), function (v) {
-      choisirVille(v.entiere || v.code);
-    });
+      if (v.type === "departement") choisirDepartement(v.code, true);
+      else choisirVille(v.entiere || v.code);
+    }, { departements: function () { return proprietes().map(function (p) { return { code: p.code, nom: p.nom }; }); } });
     carte.on("moveend", majCommunes);
-    var ville = new URLSearchParams(location.search).get("ville");
-    if (ville && /^[0-9AB]{5}$/i.test(ville)) choisirVille(RechercheVille.departement(ville) ? ville.toUpperCase() : null);
+    // Adresse : ?ville=…, ?dep=… ; anciens liens de la carte détaillée : #dep=…
+    var q = new URLSearchParams(location.search), h = new URLSearchParams(location.hash.slice(1));
+    var ville = q.get("ville"), depDemande = q.get("dep") || h.get("dep");
+    if (ville && /^[0-9AB]{5}$/i.test(ville)) choisirVille(ville.toUpperCase());
+    else if (depDemande && dep(depDemande.toUpperCase())) choisirDepartement(depDemande.toUpperCase(), true);
   }).catch(function (e) {
     if (window.console) console.error(e);
     $("legende-simple").innerHTML = '<p class="message-erreur" role="alert">Les données n\'ont pas pu être chargées. Réessayez dans quelques minutes.</p>';

@@ -1,7 +1,9 @@
-/* Carte Vélo France — recherche de ville, commune à la carte et aux statistiques.
+/* Carte Vélo France — recherche de ville (et de département sur la carte), commune à la carte et aux statistiques.
 
    Utilisation :
      var r = RechercheVille.attacher(champ, liste, function (ville) { ... });
+     // option : proposer aussi les départements (nom ou numéro) ; le choix a alors type « departement »
+     RechercheVille.attacher(champ, liste, surChoix, { departements: function () { return [{ code, nom }, …]; } });
      r.afficher("Clermont-Ferrand");        // texte affiché dans le champ
      RechercheVille.trouver("63113").then(function (ville) { ... });
 
@@ -66,7 +68,23 @@
     });
   }
 
-  function attacher(champ, liste, surChoix) {
+  /* Départements dont le nom ou le numéro correspond au texte (« 63 », « 2a », « puy de dome »…) */
+  function rechercherDepartements(deps, texte, max) {
+    var q = normaliser(texte);
+    if (!q) return [];
+    var debut = [], mot = [];
+    deps.forEach(function (d) {
+      var nom = normaliser(d.nom), code = d.code.toLowerCase();
+      if (q === code || nom.indexOf(q) === 0) debut.push(d);
+      else if (q.length >= 3 && nom.indexOf(" " + q) >= 0) mot.push(d);
+    });
+    return debut.concat(mot).slice(0, max || 3).map(function (d) {
+      return { type: "departement", code: d.code, nom: d.nom };
+    });
+  }
+
+  function attacher(champ, liste, surChoix, options) {
+    options = options || {};
     var resultats = [], actif = -1, idListe = liste.id;
     champ.setAttribute("role", "combobox");
     champ.setAttribute("aria-autocomplete", "list");
@@ -87,7 +105,7 @@
       if (!resultats.length) {
         var vide = document.createElement("li");
         vide.className = "aucun"; vide.setAttribute("role", "option"); vide.setAttribute("aria-disabled", "true");
-        vide.textContent = "Aucune commune ne correspond.";
+        vide.textContent = options.departements ? "Aucun département ni aucune commune ne correspond." : "Aucune commune ne correspond.";
         liste.appendChild(vide);
       }
       resultats.forEach(function (v, i) {
@@ -97,8 +115,9 @@
         li.setAttribute("aria-selected", i === actif ? "true" : "false");
         var nom = document.createElement("span"); nom.className = "nom"; nom.textContent = v.nom;
         var info = document.createElement("span"); info.className = "info";
-        info.textContent = (v.codesPostaux ? v.codesPostaux.split(" ").slice(0, 3).join(", ") : v.code) +
-          (v.population ? ", " + new Intl.NumberFormat("fr-FR").format(v.population) + " hab." : "");
+        info.textContent = v.type === "departement" ? "Département " + v.code
+          : (v.codesPostaux ? v.codesPostaux.split(" ").slice(0, 3).join(", ") : v.code) +
+            (v.population ? ", " + new Intl.NumberFormat("fr-FR").format(v.population) + " hab." : "");
         li.appendChild(nom); li.appendChild(info);
         li.addEventListener("mousedown", function (e) { e.preventDefault(); choisir(i); });
         liste.appendChild(li);
@@ -123,7 +142,9 @@
       if (normaliser(texte).length < 2) { fermer(); return; }
       index().then(function (l) {
         if (champ.value !== texte) return;      // l'utilisateur a continué à taper
-        resultats = rechercher(l, texte, 8); actif = resultats.length ? 0 : -1; dessiner();
+        var deps = options.departements ? rechercherDepartements(options.departements(), texte, 3) : [];
+        resultats = deps.concat(rechercher(l, texte, 8 - deps.length));
+        actif = resultats.length ? 0 : -1; dessiner();
       }).catch(function () {
         resultats = []; liste.innerHTML = '<li class="aucun" role="option" aria-disabled="true">Liste des communes indisponible.</li>';
         liste.hidden = false;
@@ -149,5 +170,6 @@
   }
 
   window.RechercheVille = { attacher: attacher, trouver: trouver, departement: departement,
+                            rechercherDepartements: rechercherDepartements,
                             rechercher: rechercher, normaliser: normaliser, index: index };
 })();
