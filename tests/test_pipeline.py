@@ -109,12 +109,16 @@ def test_indicateurs_et_score(monde):
     assert p["surface_km2"] == pytest.approx(12 * 25 + 1, abs=0.1)
     assert p["km_10k_hab"] == pytest.approx(p["km_total"] / p["population"] * 1e4, rel=1e-2)
     assert p["vls_stations_100k"] == pytest.approx(2 / p["population"] * 1e5, rel=1e-2)
+    assert p["vls_stations_10k"] == pytest.approx(2 / p["population"] * 1e4, rel=1e-2)
+    # Score sur 20 : trois critères pour 10 000 habitants
+    assert p["stat_places_10k"] == pytest.approx(p["stat_places"] / p["population"] * 1e4, rel=1e-2)
     for q in props.values():
-        assert 0 <= q["score"] <= 100
-        assert q["score_nb_indicateurs"] == 6
+        assert 0 <= q["score"] <= 20
+        # Le jeu fictif ne donne le stationnement que de quelques départements : score sur 2 critères ailleurs
+        assert q["score_nb_indicateurs"] == (3 if q["stat_places"] is not None else 2)
         assert q["rangs"]["score"] >= 1
     meilleur = min(props.values(), key=lambda q: q["rangs"]["score"])
-    assert meilleur["code"] in ("63", "75")
+    assert meilleur["score"] == max(q["score"] for q in props.values())
 
 
 def test_source_en_panne_sans_precedent(monde):
@@ -124,7 +128,7 @@ def test_source_en_panne_sans_precedent(monde):
     assert meta["sources"]["vls"]["statut"] == "indisponible"
     assert props["63"]["vls_stations"] is None and props["63"]["vls_stations_100k"] is None
     assert props["63"]["km_total"] > 0
-    assert props["63"]["score_nb_indicateurs"] == 3   # score calculé sur les seuls aménagements
+    assert props["63"]["score_nb_indicateurs"] == 2   # score calculé sur les deux critères restants
     assert stations["stations"] == []
 
 
@@ -185,26 +189,26 @@ def test_classement_communes(monde):
     paris = next(l for l in lignes if l["code"] == "75056")
     assert paris["nom"] == "Paris" and paris["dep"] == "75"
     scores = [l["score"] for l in lignes if l["score"] is not None]
-    assert scores and all(0 <= s <= 100 for s in scores)
+    assert all(0 <= s <= 20 for s in scores)
     l63 = next(l for l in lignes if l["code"] == "63012")
     assert l63["km_10k_hab"] == pytest.approx(l63["km_total"] / l63["pop"] * 1e4, rel=1e-3)
 
 
 def test_score_communes(monde):
     meta, props, _, sortie = lancer(monde)
-    # Communes : même score (6 indicateurs) partout, rang national et ex æquo dans les fiches
+    # Communes : même score sur 20 (3 critères) partout, rang national et ex æquo dans les fiches
     f63 = json.loads((sortie / "communes" / "63.json").read_text(encoding="utf-8"))
     sur = f63["score_communes"]["sur"]
     c = f63["communes"]
     assert "sc" not in c["99999"]                      # sans population : non classée
     notes = [v for v in c.values() if "sc" in v]
-    assert notes and all(1 <= v["rg"] <= sur and 0 <= v["sc"] <= 100 and v["eq"] >= 1 for v in notes)
-    a, b = sorted(notes, key=lambda v: -v["sc"])[:2]
-    assert a["rg"] <= b["rg"]
+    assert notes and all(1 <= v["rg"] <= sur and 0 <= v["sc"] <= 20 and v["eq"] >= 1 for v in notes)
     # Le classement des communes de la carte détaillée reprend exactement ce score
     cl = json.loads((sortie / "classement-communes.json").read_text(encoding="utf-8"))
     lignes = {l[0]: dict(zip(cl["champs"], l)) for l in cl["lignes"]}
-    assert lignes["63012"]["score"] == c["63012"]["sc"]
+    for code, v in c.items():
+        if "sc" in v and code in lignes:
+            assert lignes[code]["score"] == v["sc"]
     # Départements : le score de la carte détaillée, inchangé
     assert all("score_simple" not in p for p in props.values())
 
@@ -213,9 +217,17 @@ def test_rangs_rapides_et_plancher():
     assert indicateurs.rangs_rapides({"a": 3, "b": 5, "c": 3, "d": None}) == {"a": (2, 2), "b": (1, 1), "c": (2, 2), "d": None}
     # Hameau de 30 habitants avec 1 km : ramené à 10 000 habitants, il ne dépasse pas une ville bien équipée
     r = indicateurs.score_communes({
-        "hameau": {"p": 30, "s": 2, "km": {"t": 1}, "vls": {"st": 0, "v": 0}},
-        "ville": {"p": 100_000, "s": 40, "km": {"t": 300}, "vls": {"st": 50, "v": 400}},
-        "vide": {"p": 500, "s": 10, "km": {"t": 0}, "vls": {"st": 0, "v": 0}},
-        "sans_donnee": {"p": 800, "s": 5, "km": None, "vls": {"st": 0, "v": 0}}})
+        "hameau": {"p": 30, "km": {"t": 1}, "vls": {"st": 0}, "stat": {"p": 10}},
+        "ville": {"p": 100_000, "km": {"t": 300}, "vls": {"st": 50}, "stat": {"p": 3000}},
+        "vide": {"p": 500, "km": {"t": 0}, "vls": {"st": 0}, "stat": {"p": 0}},
+        "sans_donnee": {"p": 800, "km": {"t": 2}, "vls": {"st": 0}, "stat": {}}})
     assert r["sur"] == 3 and "sans_donnee" not in r["communes"]
     assert r["communes"]["ville"][1] == 1 and r["communes"]["hameau"][1] == 2
+    assert r["communes"]["ville"][0] == 20.0          # meilleure sur les trois critères
+    assert r["communes"]["vide"][0] == 0.0            # rien nulle part : 0, pas une note moyenne
+
+
+def test_valeur_nulle_vaut_zero():
+    n = indicateurs.notes_sur_20({"a": 0, "b": 0, "c": 0, "d": 5, "e": 10, "f": None})
+    assert n["a"] == n["b"] == n["c"] == 0 and n["f"] is None
+    assert n["e"] == 20 and 0 < n["d"] < 20

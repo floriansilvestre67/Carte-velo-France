@@ -1,6 +1,6 @@
 # Carte Vélo France
 
-Carte interactive de la France métropolitaine montrant où le vélo est le mieux servi : aménagements cyclables, vélos en libre-service (VLS), stationnement vélo, lieux à visiter, accidents de vélo et un « score vélo » sur 100. On peut descendre au niveau de chaque ville. Toutes les données sont ouvertes et recalculées chaque jour.
+Carte interactive de la France métropolitaine montrant où le vélo est le mieux servi : aménagements cyclables, vélos en libre-service (VLS), stationnement vélo, lieux à visiter, accidents de vélo et un « score vélo » sur 20 (aménagements, vélos en libre-service et stationnement pour 10 000 habitants). On peut descendre au niveau de chaque ville. Toutes les données sont ouvertes et recalculées chaque jour.
 
 - **Accueil** : le slogan « Où fait-il bon pédaler ? Le baromètre des territoires cyclables. » et l'accès à la carte.
 - **Carte** (grand public) : départements colorés selon le score vélo (le même que sur la carte détaillée), recherche de ville, fiche courte avec le classement, et quatre calques à activer.

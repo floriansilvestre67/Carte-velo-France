@@ -46,7 +46,7 @@
     var texte = formater(valeur, cle);
     if (texte === null) return null;
     var u = indicateur(cle).unite;
-    return u === "/ 100" ? texte + " / 100" : texte + " " + u;
+    return texte + " " + u;
   }
 
   var ordinal = CVF.ordinal, echapper = CVF.echapper, dateFr = CVF.dateFr;
@@ -354,7 +354,7 @@
     });
 
     var score = p.score != null
-      ? '<div class="score-bloc"><span class="valeur">' + formater(p.score, "score") + '</span><span class="unite">/ 100, ' +
+      ? '<div class="score-bloc"><span class="valeur">' + formater(p.score, "score") + '</span><span class="unite">/ 20, ' +
         ordinal(p.rangs.score) + " sur " + nbDepartements() + "</span></div>" +
         (function () {
           var rr = rangRegional(p, "score");
@@ -363,7 +363,7 @@
         })()
       : '<div class="score-bloc"><span class="indispo">Score indisponible</span></div>';
     var partiel = p.score != null && p.score_nb_indicateurs < etat.meta.score_indicateurs.length
-      ? '<p class="indispo">Score calculé sur ' + p.score_nb_indicateurs + " indicateurs sur " +
+      ? '<p class="indispo">Score calculé sur ' + p.score_nb_indicateurs + " critères sur " +
         etat.meta.score_indicateurs.length + " (données manquantes).</p>" : "";
 
     fiche.innerHTML =

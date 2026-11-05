@@ -1,5 +1,5 @@
 /* Carte Vélo France — carte simplifiée (carte.html).
-   Départements colorés selon le score vélo (le même que sur la carte détaillée, six indicateurs ;
+   Départements colorés selon le score vélo sur 20 (le même que sur la carte détaillée, trois critères ;
    pour les communes, calculé par le pipeline entre toutes les communes de métropole), recherche
    de ville, fiche courte au clic, et les quatre calques. Le code commun avec la carte détaillée est dans js/commun.js. */
 (function () {
@@ -49,7 +49,7 @@
         couche.bindTooltip(function () {
           var p = f.properties;
           return "<strong>" + echapper(p.nom) + "</strong>" +
-            (p.score != null ? "Score vélo : " + nombre(p.score) + " / 100" : "<em>Score indisponible</em>");
+            (p.score != null ? "Score vélo : " + nombre(p.score, 1) + " / 20" : "<em>Score indisponible</em>");
         }, { sticky: true, className: "info-dep", direction: "top", offset: [0, -8] });
         couche.on({
           mouseover: function () { if (!etat.ville && f.properties.code !== etat.selection) couche.setStyle({ weight: 2, color: "#1f2a2e" }); },
@@ -108,19 +108,21 @@
     return ordinal(rang) + (exAequo ? " ex æquo" : "") + " sur " + nombre(sur);
   }
 
-  function fiche(titre, sousTitre, score, rang, km, stations, lienDetail) {
+  // Les trois critères du score vélo : aménagements, stations de vélos en libre-service, stationnement
+  function fiche(titre, sousTitre, score, rang, km, stations, places, lienDetail) {
     var el = $("fiche-courte");
     var indispo = '<span class="indispo">indisponible</span>';
     el.innerHTML =
       '<div class="fiche-tete"><h2>' + echapper(titre) + (sousTitre ? ' <span class="code">' + echapper(sousTitre) + "</span>" : "") + "</h2>" +
       '<button type="button" class="bouton-fermer" id="fermer-fiche-courte" aria-label="Fermer">×</button></div>' +
       (score != null
-        ? '<p class="score-court"><span class="valeur">' + nombre(score) + '</span><span class="unite">/ 100</span></p>' +
+        ? '<p class="score-court"><span class="valeur">' + nombre(score, 1) + '</span><span class="unite">/ 20</span></p>' +
           '<p class="rang-court">' + echapper(rang) + "</p>"
         : '<p class="score-court"><span class="indispo">Score vélo indisponible</span></p>') +
       "<dl>" +
       "<div><dt>Aménagements cyclables</dt><dd>" + (km != null ? nombre(km, km > 0 && km < 10 ? 1 : 0) + " km" : indispo) + "</dd></div>" +
       "<div><dt>Stations de vélos en libre-service</dt><dd>" + (stations != null ? nombre(stations) : indispo) + "</dd></div>" +
+      "<div><dt>Places de stationnement vélo</dt><dd>" + (places != null ? nombre(places) : indispo) + "</dd></div>" +
       "</dl>" +
       '<a class="lien-detail" href="' + lienDetail + '">Voir le détail</a>';
     el.hidden = false;
@@ -145,7 +147,7 @@
     var egaux = classes.filter(function (q) { return q.score === p.score; }).length;
     fiche(p.nom, "(" + p.code + ")", p.score,
           p.score != null && p.rangs && p.rangs.score ? texteRang(p.rangs.score, egaux > 1, classes.length) + " départements" : null,
-          p.km_total, p.vls_stations, "carte-detaillee.html#dep=" + encodeURIComponent(code));
+          p.km_total, p.vls_stations, p.stat_places, "carte-detaillee.html#dep=" + encodeURIComponent(code));
     $("lien-detail-nav").href = "carte-detaillee.html#dep=" + encodeURIComponent(code);
   }
 
@@ -185,7 +187,8 @@
       var sur = (f.score_communes || {}).sur;
       fiche(c.n || code, (dep(d) || {}).nom || "", c.sc,
             c.rg && sur ? texteRang(c.rg, c.eq > 1, sur) + " communes" : null,
-            c.km ? c.km.t : null, c.vls ? c.vls.st : null, "carte-detaillee.html?ville=" + encodeURIComponent(code));
+            c.km ? c.km.t : null, c.vls ? c.vls.st : null, c.stat ? c.stat.p : null,
+            "carte-detaillee.html?ville=" + encodeURIComponent(code));
       if (window.matchMedia("(max-width: 700px)").matches) $("fiche-courte").focus({ preventScroll: true });
     }).catch(function () {
       var el = $("fiche-courte");
@@ -215,7 +218,7 @@
           onEachFeature: function (f, couche) {
             var c = noms[f.properties.code] || {};
             couche.bindTooltip("<strong>" + echapper(c.n || f.properties.code) + "</strong>" +
-              (c.sc != null ? "Score vélo : " + nombre(c.sc) + " / 100" : "<em>Score indisponible</em>"),
+              (c.sc != null ? "Score vélo : " + nombre(c.sc, 1) + " / 20" : "<em>Score indisponible</em>"),
               { sticky: true, className: "info-dep", direction: "top" });
             couche.on({
               mouseover: function () { couche.setStyle({ weight: 1.5, opacity: 0.8 }); },
